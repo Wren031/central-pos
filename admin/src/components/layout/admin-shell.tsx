@@ -83,19 +83,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm shadow-indigo-950/40">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
           <Database className="size-[18px]" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight text-white">Central POS</p>
-          <p className="truncate text-[11px] text-slate-400">Admin Console</p>
+          <p className="truncate text-sm font-semibold leading-tight text-foreground">Central POS</p>
+          <p className="truncate text-[11px] text-muted-foreground">Admin Console</p>
         </div>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4 pt-1">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
               {section.label}
             </p>
             <ul className="space-y-1">
@@ -107,9 +107,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white',
+                        'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
                         isActive &&
-                          'bg-white/10 text-white shadow-sm ring-1 ring-white/10 [&_svg]:text-indigo-400',
+                          'bg-muted text-foreground [&_svg]:text-primary',
                       )
                     }
                   >
@@ -123,23 +123,23 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-border p-3">
         <div className="flex items-center gap-3 rounded-lg p-2">
           <Avatar className="size-9">
-            <AvatarFallback className="bg-indigo-500/15 text-xs font-semibold text-indigo-300 ring-1 ring-inset ring-indigo-400/30">
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20">
               {initials(profile?.full_name, 'A')}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">
+            <p className="truncate text-sm font-medium text-foreground">
               {profile?.full_name || 'Admin'}
             </p>
-            <p className="truncate text-[11px] text-slate-400">{profile?.email}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{profile?.email}</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="size-8 text-slate-400 hover:bg-white/10 hover:text-white"
+            className="size-8 text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => void handleLogout()}
             aria-label="Sign out"
             title="Sign out"
@@ -216,7 +216,7 @@ export function AdminShell() {
     <Sheet open={open} onOpenChange={setOpen}>
       <div className="min-h-screen bg-background">
         {/* Desktop sidebar */}
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-background lg:flex">
           <SidebarContent />
         </aside>
 
@@ -253,7 +253,7 @@ export function AdminShell() {
       {/* Mobile sidebar */}
       <SheetContent
         side="left"
-        className="w-72 border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-slate-400"
+        className="w-72 border-r border-border bg-background p-0 [&>button]:text-muted-foreground"
       >
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <SidebarContent onNavigate={() => setOpen(false)} />

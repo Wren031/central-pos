@@ -39,6 +39,29 @@ export function posTypeIcon(name: string | null | undefined): LucideIcon {
   return POS_TYPE_ICONS[name ?? ''] ?? Store
 }
 
+export const POS_TYPE_CATEGORIES = [
+  'food_beverage',
+  'retail',
+  'health',
+  'services',
+  'other',
+] as const
+
+export type PosTypeCategory = (typeof POS_TYPE_CATEGORIES)[number]
+
+export const POS_TYPE_CATEGORY_LABELS: Record<string, string> = {
+  food_beverage: 'Food & Beverage',
+  retail: 'Retail',
+  health: 'Health & Pharmacy',
+  services: 'Services',
+  other: 'Other',
+}
+
+export function posTypeCategoryLabel(id: string | null | undefined): string {
+  if (!id) return 'Uncategorized'
+  return POS_TYPE_CATEGORY_LABELS[id] ?? id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+}
+
 /* ---------- Plans ---------- */
 
 export const PLAN_LABELS: Record<string, string> = {

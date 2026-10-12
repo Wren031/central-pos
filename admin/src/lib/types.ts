@@ -29,6 +29,7 @@ export interface PosType {
   tagline: string | null
   description: string | null
   icon: string | null
+  category: string | null
   active: boolean
   sort_order: number
   created_at: string

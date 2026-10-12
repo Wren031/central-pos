@@ -135,11 +135,14 @@ create table if not exists public.pos_types (
   tagline     text,
   description text,
   icon        text,
+  category    text,
   active      boolean not null default true,
   sort_order  int not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+alter table public.pos_types add column if not exists category text;
 
 create index if not exists pos_types_active_idx on public.pos_types (active, sort_order);
 

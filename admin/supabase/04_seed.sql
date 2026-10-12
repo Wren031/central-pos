@@ -49,28 +49,28 @@ $$;
 -- ---------------------------------------------------------------------------
 -- POS types (ids match client/src/lib/pos-types.ts)
 -- ---------------------------------------------------------------------------
-insert into public.pos_types (id, name, tagline, description, icon, sort_order) values
+insert into public.pos_types (id, name, tagline, description, icon, category, sort_order) values
   ('bbq',         'BBQ POS',              'Grill houses & ihawan',
    'Built for Filipino barbecue stalls and ihawan — fast order taking for dine-in, takeout, and bilao catering with per-kilo tracking.',
-   'Flame', 1),
+   'Flame', 'food_beverage', 1),
   ('retail',      'Retail Store POS',     'Boutiques & sari-sari retail',
    'General retail checkout with SKU search, promotions, and stock counts for apparel, gadgets, and variety stores.',
-   'ShoppingBag', 2),
+   'ShoppingBag', 'retail', 2),
   ('grocery',     'Grocery POS',          'Supermarkets & wet-market grocers',
    'High-volume scanning checkout with weight-based items, expiry tracking, and bulk pricing.',
-   'ShoppingBasket', 3),
+   'ShoppingBasket', 'retail', 3),
   ('restaurant',  'Restaurant POS',       'Carinderias & full-service dining',
    'Dine-in, takeout, and delivery ticketing with table tracking and kitchen-friendly order flow.',
-   'UtensilsCrossed', 4),
+   'UtensilsCrossed', 'food_beverage', 4),
   ('cafe',        'Cafe POS',             'Coffee shops & milk-tea bars',
    'Quick drink customization, add-ons, and queue numbers for busy cafes and milk-tea shops.',
-   'Coffee', 5),
+   'Coffee', 'food_beverage', 5),
   ('pharmacy',    'Pharmacy POS',         'Drugstores & boticas',
    'Prescription tracking, per-item batch and expiry dates, and senior-discount handling.',
-   'Cross', 6),
+   'Cross', 'health', 6),
   ('general',     'General Merchandise',  'All-around sari-sari stores',
    'A flexible setup for neighborhood stores selling a bit of everything.',
-   'Store', 7)
+   'Store', 'retail', 7)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------

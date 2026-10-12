@@ -4,7 +4,12 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAsync } from '@/hooks/use-async'
 import { errorMessage } from '@/lib/errors'
-import { POS_TYPE_ICON_NAMES, posTypeIcon } from '@/lib/constants'
+import {
+  POS_TYPE_CATEGORIES,
+  POS_TYPE_ICON_NAMES,
+  posTypeCategoryLabel,
+  posTypeIcon,
+} from '@/lib/constants'
 import type { PosType } from '@/lib/types'
 import { PageHeader } from '@/components/common/page-header'
 import { Modal } from '@/components/common/modal'
@@ -29,6 +34,7 @@ interface PosTypeForm {
   tagline: string
   description: string
   icon: string
+  category: string
   sort_order: number
   active: boolean
 }
@@ -39,6 +45,7 @@ const EMPTY_FORM: PosTypeForm = {
   tagline: '',
   description: '',
   icon: 'Store',
+  category: 'other',
   sort_order: 0,
   active: true,
 }
@@ -66,6 +73,7 @@ export function PosTypesPage() {
         tagline: t.tagline ?? '',
         description: t.description ?? '',
         icon: t.icon ?? 'Store',
+        category: t.category ?? 'other',
         sort_order: t.sort_order,
         active: t.active,
       },
@@ -104,6 +112,7 @@ export function PosTypesPage() {
         tagline: form.tagline.trim() || null,
         description: form.description.trim() || null,
         icon: form.icon,
+        category: form.category,
         sort_order: form.sort_order,
         active: form.active,
       }
@@ -170,15 +179,20 @@ export function PosTypesPage() {
                       <p className="text-xs text-muted-foreground">{t.tagline ?? t.id}</p>
                     </div>
                   </div>
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none ${
-                      t.active
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : 'border-zinc-200 bg-zinc-100 text-zinc-600'
-                    }`}
-                  >
-                    {t.active ? 'active' : 'inactive'}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none ${
+                        t.active
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-zinc-200 bg-zinc-100 text-zinc-600'
+                      }`}
+                    >
+                      {t.active ? 'active' : 'inactive'}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium leading-none text-sky-700">
+                      {posTypeCategoryLabel(t.category)}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-3 line-clamp-3 min-h-[3rem] text-sm text-muted-foreground">
                   {t.description ?? 'No description yet.'}
@@ -282,6 +296,29 @@ export function PosTypesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select
+                  value={editing.form.category}
+                  onValueChange={(v) =>
+                    setEditing({ ...editing, form: { ...editing.form, category: v } })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POS_TYPE_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {posTypeCategoryLabel(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Groups POS types in the catalog for stores.
+                </p>
               </div>
             </div>
             <div className="space-y-1.5">

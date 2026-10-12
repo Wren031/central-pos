@@ -4,8 +4,9 @@ Subscription management console for the Central POS platform. A standalone
 React + Vite app that talks to **Supabase** (Auth + PostgreSQL) — completely
 separate from the customer POS workspace in `../client`.
 
-**Stack:** React 19 · Vite · TypeScript · Tailwind CSS v4 · DaisyUI 5 ·
-Recharts · @supabase/supabase-js · react-router-dom 7 · sonner
+**Stack:** React 19 · Vite · TypeScript · Tailwind CSS v4 · shadcn/ui
+(Radix primitives, Lucide icons) · Recharts · @supabase/supabase-js ·
+react-router-dom 7 · sonner
 
 ## Features
 

@@ -149,14 +149,14 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-xl border border-border bg-card text-card-foreground shadow-xs ${className ?? ''}`}
+      className={`rounded-2xl border border-border/70 bg-card text-card-foreground shadow-xs ${className ?? ''}`}
     >
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-5 py-4">
           <div>
-            {title && <h2 className="text-sm font-semibold text-foreground">{title}</h2>}
+            {title && <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>}
             {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
             )}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
