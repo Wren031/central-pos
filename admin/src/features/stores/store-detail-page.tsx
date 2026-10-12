@@ -31,7 +31,7 @@ type StoreDetailRow = Store & {
 
 function StoreDetailSkeleton() {
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="space-y-5">
       <div className="space-y-2.5">
         <Skeleton className="h-3 w-36" />
         <div className="flex items-center gap-3">
@@ -86,7 +86,7 @@ export function StoreDetailPage() {
 
   if (store.error) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="-ml-2.5">
           <Link to="/stores">
             <ArrowLeft className="size-4" />
@@ -101,7 +101,7 @@ export function StoreDetailPage() {
   const detail = store.data
   if (!detail) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="-ml-2.5">
           <Link to="/stores">
             <ArrowLeft className="size-4" />
@@ -129,7 +129,7 @@ export function StoreDetailPage() {
   const phone = detail.phone ?? detail.owner?.contact_number
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="space-y-3">
         <Breadcrumb parent="Stores" parentTo="/stores" current={detail.name} />

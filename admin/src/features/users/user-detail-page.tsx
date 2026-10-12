@@ -31,7 +31,7 @@ type UserDetailRow = Profile & {
 
 function UserDetailSkeleton() {
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="space-y-5">
       <div className="space-y-2.5">
         <Skeleton className="h-3 w-36" />
         <div className="flex items-center gap-3">
@@ -92,7 +92,7 @@ export function UserDetailPage() {
 
   if (user.error) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="-ml-2.5">
           <Link to="/users">
             <ArrowLeft className="size-4" />
@@ -107,7 +107,7 @@ export function UserDetailPage() {
   const detail = user.data
   if (!detail) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="-ml-2.5">
           <Link to="/users">
             <ArrowLeft className="size-4" />
@@ -134,7 +134,7 @@ export function UserDetailPage() {
   const days = sub?.expires_at ? daysUntil(sub.expires_at) : null
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="space-y-3">
         <Breadcrumb parent="Users" parentTo="/users" current={detail.full_name || detail.email} />
