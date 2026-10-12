@@ -215,7 +215,13 @@ export function AdminShell() {
 
   const pageTitle =
     PAGE_TITLES[location.pathname] ??
-    (location.pathname.startsWith('/pos-types/') ? 'POS Type Categories' : 'Admin')
+    (location.pathname.startsWith('/pos-types/')
+      ? 'POS Type Categories'
+      : location.pathname.startsWith('/users/')
+        ? 'User Details'
+        : location.pathname.startsWith('/stores/')
+          ? 'Store Details'
+          : 'Admin')
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

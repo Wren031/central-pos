@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MapPin, Phone, Power, PowerOff, RotateCw, Store as StoreIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -11,7 +12,6 @@ import { PageHeader } from '@/components/common/page-header'
 import { SearchInput } from '@/components/common/search-input'
 import { FilterSelect } from '@/components/common/filter-select'
 import { Pagination } from '@/components/common/pagination'
-import { Modal } from '@/components/common/modal'
 import { ConfirmModal } from '@/components/common/states'
 import {
   Card,
@@ -39,12 +39,12 @@ type StoreRow = Store & {
 const PAGE_SIZE = 20
 
 export function StoresPage() {
+  const navigate = useNavigate()
   const [searchInput, setSearchInput] = React.useState('')
   const search = useDebounced(searchInput)
   const [statusFilter, setStatusFilter] = React.useState('all')
   const [posTypeFilter, setPosTypeFilter] = React.useState('all')
   const [page, setPage] = React.useState(1)
-  const [selected, setSelected] = React.useState<StoreRow | null>(null)
   const [confirmTarget, setConfirmTarget] = React.useState<StoreRow | null>(null)
   const [busy, setBusy] = React.useState(false)
 
@@ -99,7 +99,6 @@ export function StoresPage() {
       if (error) throw new Error(errorMessage(error))
       toast.success(`Store "${store.name}" is now ${next}.`)
       setConfirmTarget(null)
-      setSelected(null)
       stores.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -243,7 +242,11 @@ export function StoresPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelected(store)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/stores/${store.id}`)}
+                          >
                             View
                           </Button>
                           <Button
@@ -281,8 +284,6 @@ export function StoresPage() {
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
 
-      <StoreDetailModal store={selected} onClose={() => setSelected(null)} />
-
       <ConfirmModal
         open={confirmTarget !== null}
         title={confirmTarget?.status === 'active' ? 'Suspend store?' : 'Activate store?'}
@@ -308,59 +309,3 @@ export function StoresPage() {
   )
 }
 
-function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-lg bg-muted/60 p-3">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-medium break-words">{value || '—'}</p>
-    </div>
-  )
-}
-
-function StoreDetailModal({ store, onClose }: { store: StoreRow | null; onClose: () => void }) {
-  return (
-    <Modal open={store !== null} onClose={onClose} title="Store details" size="lg">
-      {store && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-              {React.createElement(posTypeIcon(store.posType?.icon ?? store.pos_type), { className: 'size-6' })}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{store.name}</p>
-              <p className="truncate text-sm text-muted-foreground">
-                {store.posType?.name ?? store.pos_type}
-              </p>
-            </div>
-            <span
-              className={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none ${
-                store.status === 'active'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-red-200 bg-red-50 text-red-700'
-              }`}
-            >
-              {store.status}
-            </span>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoField label="Owner" value={store.owner?.full_name} />
-            <InfoField label="Owner email" value={store.owner?.email} />
-            <InfoField label="Store email" value={store.email} />
-            <InfoField label="Phone" value={store.phone ?? store.owner?.contact_number} />
-            <InfoField label="Address" value={store.address} />
-            <InfoField label="Created" value={formatDate(store.created_at)} />
-            <InfoField label="Onboarded" value={store.onboarded ? 'Yes' : 'No'} />
-            <InfoField label="Store ID" value={<span className="font-mono text-xs">{store.id}</span>} />
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  )
-}

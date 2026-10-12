@@ -7,7 +7,9 @@ import { LoginPage } from '@/features/auth/login-page'
 import { LandingPage } from '@/features/landing/landing-page'
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { UsersPage } from '@/features/users/users-page'
+import { UserDetailPage } from '@/features/users/user-detail-page'
 import { StoresPage } from '@/features/stores/stores-page'
+import { StoreDetailPage } from '@/features/stores/store-detail-page'
 import { SubscriptionsPage } from '@/features/subscriptions/subscriptions-page'
 import { PaymentsPage } from '@/features/payments/payments-page'
 import { PosTypesPage } from '@/features/pos-types/pos-types-page'
@@ -27,7 +29,9 @@ export default function App() {
             <Route element={<AdminShell />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/users/:userId" element={<UserDetailPage />} />
               <Route path="/stores" element={<StoresPage />} />
+              <Route path="/stores/:storeId" element={<StoreDetailPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/pos-types" element={<PosTypesPage />} />

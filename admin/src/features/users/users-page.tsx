@@ -1,17 +1,16 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, Power, PowerOff, RotateCw, Store as StoreIcon, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAsync, useDebounced } from '@/hooks/use-async'
 import { errorMessage, sanitizeSearch } from '@/lib/errors'
-import { formatDate, formatDateTime, initials, daysUntil } from '@/lib/format'
-import { planLabel } from '@/lib/constants'
+import { formatDate, initials, daysUntil } from '@/lib/format'
 import type { PosType, Profile, Subscription } from '@/lib/types'
 import { PageHeader } from '@/components/common/page-header'
 import { SearchInput } from '@/components/common/search-input'
 import { FilterSelect } from '@/components/common/filter-select'
 import { Pagination } from '@/components/common/pagination'
-import { Modal } from '@/components/common/modal'
 import { ConfirmModal } from '@/components/common/states'
 import {
   Card,
@@ -46,11 +45,11 @@ type UserRow = Profile & {
 const PAGE_SIZE = 20
 
 export function UsersPage() {
+  const navigate = useNavigate()
   const [searchInput, setSearchInput] = React.useState('')
   const search = useDebounced(searchInput)
   const [statusFilter, setStatusFilter] = React.useState('all')
   const [page, setPage] = React.useState(1)
-  const [selected, setSelected] = React.useState<UserRow | null>(null)
   const [confirmTarget, setConfirmTarget] = React.useState<UserRow | null>(null)
   const [busy, setBusy] = React.useState(false)
 
@@ -107,7 +106,6 @@ export function UsersPage() {
           : `${user.full_name || user.email} reactivated.`
       )
       setConfirmTarget(null)
-      setSelected(null)
       users.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -237,7 +235,11 @@ export function UsersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelected(user)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/users/${user.id}`)}
+                          >
                             View
                           </Button>
                           <Button
@@ -269,11 +271,11 @@ export function UsersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setSelected(user)}>
+                              <DropdownMenuItem onClick={() => navigate(`/users/${user.id}`)}>
                                 Account details
                               </DropdownMenuItem>
                               {store && (
-                                <DropdownMenuItem onClick={() => setSelected(user)}>
+                                <DropdownMenuItem onClick={() => navigate(`/users/${user.id}`)}>
                                   <StoreIcon className="size-3.5" />
                                   Store info
                                 </DropdownMenuItem>
@@ -297,8 +299,6 @@ export function UsersPage() {
         total={total}
         onPageChange={setPage}
       />
-
-      <UserDetailModal user={selected} onClose={() => setSelected(null)} />
 
       <ConfirmModal
         open={confirmTarget !== null}
@@ -325,78 +325,3 @@ export function UsersPage() {
   )
 }
 
-function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-lg bg-muted/60 p-3">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-medium break-words">{value || '—'}</p>
-    </div>
-  )
-}
-
-function UserDetailModal({ user, onClose }: { user: UserRow | null; onClose: () => void }) {
-  const store = user?.store?.[0] ?? null
-  const sub = user && Array.isArray(user.subscription) ? (user.subscription[0] ?? null) : user?.subscription ?? null
-
-  return (
-    <Modal open={user !== null} onClose={onClose} title="Account details" size="lg">
-      {user && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="size-12">
-              <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-                {initials(user.full_name, 'U')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{user.full_name || '—'}</p>
-              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-            </div>
-            <div className="ml-auto">
-              <ProfileStatusBadge status={user.status} />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoField label="Business name" value={user.business_name} />
-            <InfoField label="Contact number" value={user.contact_number} />
-            <InfoField label="Address" value={user.address} />
-            <InfoField label="Joined" value={formatDateTime(user.created_at)} />
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-sm font-semibold text-foreground">Store</h4>
-            {store ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoField label="Store name" value={store.name} />
-                <InfoField label="POS type" value={store.pos_type} />
-                <InfoField label="Store status" value={store.status} />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No store registered yet.</p>
-            )}
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-sm font-semibold text-foreground">Subscription</h4>
-            {sub ? (
-              <div className="grid gap-3 sm:grid-cols-3">
-                <InfoField label="Plan" value={planLabel(sub.plan_id)} />
-                <InfoField label="Status" value={sub.status} />
-                <InfoField label="Expires" value={formatDate(sub.expires_at)} />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No subscription on record.</p>
-            )}
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  )
-}
