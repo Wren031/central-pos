@@ -1,11 +1,10 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Loader2, Lock, Mail, Phone, Store, User } from 'lucide-react'
+import { Check, Eye, EyeOff, Loader2, Lock, Mail, Phone, Store, User } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -20,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
 import { AuthLayout } from './auth-layout'
+import { OtpVerifyStep } from './otp-verify-step'
 
 const schema = z
   .object({
@@ -86,11 +86,57 @@ function InputIcon({ icon: Icon }: { icon: typeof User }) {
   )
 }
 
+function StepIndicator({ current }: { current: 1 | 2 }) {
+  return (
+    <div className="mb-6 flex items-center gap-2.5" aria-label={`Step ${current} of 2`}>
+      {[1, 2].map((n) => {
+        const done = current > n
+        const active = current === n
+        return (
+          <React.Fragment key={n}>
+            {n === 2 && (
+              <span
+                className={cn(
+                  'h-px flex-1 transition-colors duration-300',
+                  done ? 'bg-foreground/30' : 'bg-border'
+                )}
+                aria-hidden
+              />
+            )}
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold transition-colors duration-300',
+                  active && 'bg-primary text-primary-foreground',
+                  done && 'bg-foreground/10 text-foreground',
+                  !active && !done && 'bg-muted text-muted-foreground'
+                )}
+                aria-hidden
+              >
+                {done ? <Check className="size-3.5" /> : n}
+              </span>
+              <span
+                className={cn(
+                  'hidden text-xs font-medium sm:inline',
+                  active ? 'text-foreground' : 'text-muted-foreground'
+                )}
+              >
+                {n === 1 ? 'Account details' : 'Verify email'}
+              </span>
+            </div>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
 export function RegisterPage() {
   const { user, register } = useAuth()
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = React.useState(false)
-  const [serverError, setServerError] = React.useState<string | null>(null)
+  const [step, setStep] = React.useState<'details' | 'verify'>('details')
+  const pendingValues = React.useRef<FormValues | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -109,26 +155,33 @@ export function RegisterPage() {
 
   if (user) return <Navigate to="/" replace />
 
-  async function onSubmit(values: FormValues) {
-    setServerError(null)
-    try {
-      const fullName = [values.firstName, values.middleName, values.lastName]
-        .map((part) => (part ?? '').trim())
-        .filter(Boolean)
-        .join(' ')
-      await register({
-        fullName,
-        address: values.address,
-        contactNumber: values.contactNumber,
-        businessName: values.businessName,
-        email: values.email,
-        password: values.password,
-      })
-      toast.success('Account created — your 30-day free trial is active!')
-      navigate('/onboarding', { replace: true })
-    } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Registration failed.')
-    }
+  function onSubmit(values: FormValues) {
+    pendingValues.current = values
+    setStep('verify')
+  }
+
+  function handleBack() {
+    if (pendingValues.current) form.reset(pendingValues.current)
+    setStep('details')
+  }
+
+  async function handleVerified() {
+    const values = pendingValues.current
+    if (!values) return
+    const fullName = [values.firstName, values.middleName, values.lastName]
+      .map((part) => (part ?? '').trim())
+      .filter(Boolean)
+      .join(' ')
+    await register({
+      fullName,
+      address: values.address,
+      contactNumber: values.contactNumber,
+      businessName: values.businessName,
+      email: values.email,
+      password: values.password,
+    })
+    toast.success('Account created — your 30-day free trial is active!')
+    navigate('/onboarding', { replace: true })
   }
 
   const submitting = form.formState.isSubmitting
@@ -137,8 +190,12 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="Start with a 30-day free trial. No credit card required."
+      title={step === 'verify' ? 'Verify your email' : 'Create your account'}
+      subtitle={
+        step === 'verify'
+          ? 'One last step — confirm your email to create your account.'
+          : 'Start with a 30-day free trial. No credit card required.'
+      }
       footer={
         <>
           Already have an account?{' '}
@@ -148,12 +205,24 @@ export function RegisterPage() {
         </>
       }
     >
-      {serverError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Registration failed</AlertTitle>
-          <AlertDescription>{serverError}</AlertDescription>
-        </Alert>
-      )}
+      {step === 'verify' ? (
+        <div
+          key="verify"
+          className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+        >
+          <StepIndicator current={2} />
+          <OtpVerifyStep
+            email={pendingValues.current?.email ?? ''}
+            onVerified={handleVerified}
+            onBack={handleBack}
+          />
+        </div>
+      ) : (
+        <div
+          key="details"
+          className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+        >
+          <StepIndicator current={1} />
       <Form {...form} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <SectionLabel>Owner</SectionLabel>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -378,6 +447,8 @@ export function RegisterPage() {
             By registering you agree to our mock Terms of Service and Privacy Policy.
           </p>
       </Form>
+        </div>
+      )}
     </AuthLayout>
   )
 }
