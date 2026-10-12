@@ -36,6 +36,24 @@ export interface PosType {
   updated_at: string
 }
 
+export interface Category {
+  id: string
+  name: string
+  slug: string
+  active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PosTypeCategory {
+  pos_type_id: string
+  category_id: string
+  sort_order: number
+  created_at: string
+  category?: Category | null
+}
+
 export interface SubscriptionPlan {
   id: string
   name: string
@@ -122,6 +140,23 @@ export interface SystemSetting {
   value: unknown
   description: string | null
   updated_by: string | null
+  updated_at: string
+}
+
+export type ReleasePlatform = 'android' | 'windows'
+export type ReleaseStatus = 'draft' | 'published'
+
+export interface PosRelease {
+  id: string
+  platform: ReleasePlatform
+  version: string
+  file_path: string | null
+  download_url: string | null
+  file_size_bytes: number | null
+  release_notes: string | null
+  status: ReleaseStatus
+  created_by: string | null
+  created_at: string
   updated_at: string
 }
 

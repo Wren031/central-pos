@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, Lock, LogIn, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -131,6 +131,14 @@ export function LoginPage() {
 
         <p className="mt-5 text-center text-xs text-muted-foreground">
           Customer POS accounts cannot sign in here — admin access only.
+        </p>
+        <p className="mt-2 text-center text-xs">
+          <Link
+            to="/landing"
+            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            ← Back to website
+          </Link>
         </p>
       </div>
     </div>

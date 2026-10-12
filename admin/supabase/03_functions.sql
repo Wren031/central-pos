@@ -204,6 +204,129 @@ create trigger audit_pos_types
   after insert or update or delete on public.pos_types
   for each row execute function public.audit_pos_types();
 
+create or replace function public.audit_categories()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(current_setting('app.skip_audit', true), '0') = '1'
+     or auth.uid() is null or not public.is_admin() then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'INSERT' then
+    perform public.log_activity('category.create', 'category', new.id::text,
+      'Created category ' || new.name, jsonb_build_object('slug', new.slug));
+  elsif tg_op = 'UPDATE' then
+    if old.name is distinct from new.name
+       or old.active is distinct from new.active
+       or old.sort_order is distinct from new.sort_order then
+      perform public.log_activity('category.update', 'category', new.id::text,
+        'Updated category ' || new.name,
+        jsonb_build_object(
+          'name', jsonb_build_object('from', old.name, 'to', new.name),
+          'active', jsonb_build_object('from', old.active, 'to', new.active),
+          'sort_order', jsonb_build_object('from', old.sort_order, 'to', new.sort_order)));
+    end if;
+  elsif tg_op = 'DELETE' then
+    perform public.log_activity('category.delete', 'category', old.id::text,
+      'Deleted category ' || old.name, '{}'::jsonb);
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists audit_categories on public.categories;
+create trigger audit_categories
+  after insert or update or delete on public.categories
+  for each row execute function public.audit_categories();
+
+create or replace function public.audit_pos_type_categories()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cat_name text;
+  v_pt_name  text;
+begin
+  if coalesce(current_setting('app.skip_audit', true), '0') = '1'
+     or auth.uid() is null or not public.is_admin() then
+    return coalesce(new, old);
+  end if;
+  select name into v_cat_name from public.categories
+    where id = coalesce(new.category_id, old.category_id);
+  select name into v_pt_name from public.pos_types
+    where id = coalesce(new.pos_type_id, old.pos_type_id);
+  if tg_op = 'INSERT' then
+    perform public.log_activity('category.assign', 'pos_type', new.pos_type_id,
+      'Assigned category ' || coalesce(v_cat_name, '?') || ' to ' || coalesce(v_pt_name, new.pos_type_id),
+      jsonb_build_object('category_id', new.category_id, 'sort_order', new.sort_order));
+  elsif tg_op = 'UPDATE' and old.sort_order is distinct from new.sort_order then
+    perform public.log_activity('category.reorder', 'pos_type', new.pos_type_id,
+      'Reordered category ' || coalesce(v_cat_name, '?') || ' in ' || coalesce(v_pt_name, new.pos_type_id),
+      jsonb_build_object('category_id', new.category_id,
+        'sort_order', jsonb_build_object('from', old.sort_order, 'to', new.sort_order)));
+  elsif tg_op = 'DELETE' then
+    perform public.log_activity('category.unassign', 'pos_type', old.pos_type_id,
+      'Removed category ' || coalesce(v_cat_name, '?') || ' from ' || coalesce(v_pt_name, old.pos_type_id),
+      jsonb_build_object('category_id', old.category_id));
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists audit_pos_type_categories on public.pos_type_categories;
+create trigger audit_pos_type_categories
+  after insert or update or delete on public.pos_type_categories
+  for each row execute function public.audit_pos_type_categories();
+
+-- ---------------------------------------------------------------------------
+-- admin_delete_category — delete a category with a product-usage safeguard.
+-- If a products table exists and references the category, deletion is blocked
+-- so live product data is never orphaned.
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_delete_category(target_category uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name     text;
+  v_products bigint := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'admin access required';
+  end if;
+
+  select name into v_name from public.categories where id = target_category;
+  if v_name is null then
+    raise exception 'category not found';
+  end if;
+
+  -- Forward-compatible guard: the POS client's products table (when present)
+  -- references categories. Block deletion while products still use it.
+  if to_regclass('public.products') is not null then
+    execute 'select count(*) from public.products where category_id = $1'
+      into v_products using target_category;
+  end if;
+
+  if v_products > 0 then
+    raise exception 'cannot delete "%" — % product(s) still use this category. Reassign or remove them first.',
+      v_name, v_products;
+  end if;
+
+  perform set_config('app.skip_audit', '1', true);
+  delete from public.categories where id = target_category;
+
+  perform public.log_activity('category.delete', 'category', target_category::text,
+    'Deleted category ' || v_name, jsonb_build_object('products', v_products));
+end;
+$$;
+
 create or replace function public.audit_plans()
 returns trigger
 language plpgsql

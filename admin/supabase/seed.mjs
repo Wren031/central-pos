@@ -1,4 +1,4 @@
-// Seeds the Central POS Supabase database — all 4 SQL files, in order.
+// Seeds the Central POS Supabase database — all SQL files, in order.
 // Usage: node seed.mjs <SUPABASE_ACCESS_TOKEN> [projectRef]
 // Token: https://supabase.com/dashboard/account/tokens
 import { readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ if (!token) {
 }
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const files = ['01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql'];
+const files = ['01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql'];
 
 for (const f of files) {
   const sql = readFileSync(join(dir, f), 'utf8');

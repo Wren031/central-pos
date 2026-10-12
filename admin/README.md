@@ -24,6 +24,14 @@ react-router-dom 7 · sonner
   restaurant, cafe, pharmacy, general merchandise) and add new ones.
 - **Payments** — mock payment records with references, methods, and statuses
   (succeeded/pending/failed/refunded). No gateway is connected.
+- **Landing page** (`/landing`) — public marketing site: hero, features,
+  supported POS types, subscription plans, how-it-works, installer downloads
+  (published releases only), FAQ, and footer. "Get Started" links to the POS
+  client's registration (`VITE_POS_APP_URL`); the catch-all route serves it.
+- **Downloads** — publish POS installers (Android APK / Windows EXE) to the
+  public `pos-releases` storage bucket with version, file size, release notes,
+  and draft/published status. Only published releases appear on the landing
+  page. No release is seeded — create one after uploading a real build.
 - **Activity logs** — append-only audit trail (automatic DB triggers + RPC
   logging).
 - **Settings** — system configuration, subscription plan pricing/durations,
@@ -50,6 +58,10 @@ order**:
    `verify_subscription()`, `promote_to_admin()`
 4. `supabase/04_seed.sql` — plans, POS types, settings, and realistic demo data
    (18 customers, 18 stores, subscriptions, mock payments, logs)
+5. `supabase/05_categories_migration.sql` — global `categories` catalog +
+   `pos_type_categories` assignments
+6. `supabase/06_releases.sql` — `pos_releases` (installer releases), anon
+   read policies for landing data, and the public `pos-releases` storage bucket
 
 The scripts are idempotent — safe to re-run after a partial failure.
 
@@ -81,6 +93,7 @@ Fill `.env.local` (Supabase → Settings → API):
 ```
 VITE_SUPABASE_URL=https://your-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_...   # or the legacy anon key
+VITE_POS_APP_URL=http://localhost:5173      # POS client app base URL
 ```
 
 > **Security:** only the publishable/anon key belongs in the frontend. Every
@@ -116,7 +129,7 @@ Demo customer logins (created by the seed): `juan@bbqhouse.ph` /
   `04_seed.sql`, or skip the demo data entirely — the admin app works with
   empty tables.
 - **`Could not find the table 'public.…' in the schema cache`** — the SQL has
-  not been applied yet (or only partially). Re-run the four files in order.
+  not been applied yet (or only partially). Re-run the six files in order.
 
 ## Architecture notes
 

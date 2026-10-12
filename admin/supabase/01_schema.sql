@@ -152,6 +152,43 @@ create trigger pos_types_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- categories — global product-category catalog (admin-managed).
+-- A POS workspace loads the categories assigned to its pos_type through the
+-- pos_type_categories junction below when the device is online / syncing.
+-- ---------------------------------------------------------------------------
+create table if not exists public.categories (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null check (length(btrim(name)) between 1 and 60),
+  slug       text not null unique check (slug ~ '^[a-z][a-z0-9_]{1,39}$'),
+  active     boolean not null default true,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists categories_active_idx on public.categories (active, sort_order);
+
+drop trigger if exists categories_set_updated_at on public.categories;
+create trigger categories_set_updated_at
+  before update on public.categories
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- pos_type_categories — many-to-many assignment of categories to POS types.
+-- sort_order is per POS type so each workspace can order its own list.
+-- ---------------------------------------------------------------------------
+create table if not exists public.pos_type_categories (
+  pos_type_id text not null references public.pos_types (id) on delete cascade,
+  category_id uuid not null references public.categories (id) on delete cascade,
+  sort_order  int not null default 0,
+  created_at  timestamptz not null default now(),
+  primary key (pos_type_id, category_id)
+);
+
+create index if not exists pos_type_categories_category_idx
+  on public.pos_type_categories (category_id);
+
+-- ---------------------------------------------------------------------------
 -- subscription_plans — trial / weekly / monthly / yearly (editable in Settings)
 -- ---------------------------------------------------------------------------
 create table if not exists public.subscription_plans (

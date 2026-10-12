@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Seeds the Central POS Supabase database — all 4 SQL files, in order.
+  Seeds the Central POS Supabase database — all SQL files, in order.
 
 .DESCRIPTION
   Two ways to authenticate (pick ONE):
@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$files = @('01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql')
+$files = @('01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql')
 
 if (-not $Token -and -not $DbPassword) {
   Write-Error 'Provide -Token <supabase-access-token> OR -DbPassword <database-password>. See .SYNOPSIS above.'

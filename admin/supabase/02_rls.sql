@@ -107,6 +107,44 @@ create policy "pos_types_write_admin"
   with check (public.is_admin());
 
 -- ---------------------------------------------------------------------------
+-- categories — catalog is readable by any signed-in device (a POS workspace
+-- needs it to sync its assigned category list); admins manage it.
+-- ---------------------------------------------------------------------------
+alter table public.categories enable row level security;
+
+drop policy if exists "categories_select_authenticated" on public.categories;
+create policy "categories_select_authenticated"
+  on public.categories for select
+  to authenticated
+  using (true);
+
+drop policy if exists "categories_write_admin" on public.categories;
+create policy "categories_write_admin"
+  on public.categories for all
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- pos_type_categories — devices read their own pos_type's assignments;
+-- admins manage all.
+-- ---------------------------------------------------------------------------
+alter table public.pos_type_categories enable row level security;
+
+drop policy if exists "pos_type_categories_select_authenticated" on public.pos_type_categories;
+create policy "pos_type_categories_select_authenticated"
+  on public.pos_type_categories for select
+  to authenticated
+  using (true);
+
+drop policy if exists "pos_type_categories_write_admin" on public.pos_type_categories;
+create policy "pos_type_categories_write_admin"
+  on public.pos_type_categories for all
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- ---------------------------------------------------------------------------
 -- subscription_plans — public catalog, admin-managed
 -- ---------------------------------------------------------------------------
 alter table public.subscription_plans enable row level security;

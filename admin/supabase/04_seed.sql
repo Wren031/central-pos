@@ -74,6 +74,52 @@ insert into public.pos_types (id, name, tagline, description, icon, category, so
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- Product categories — global catalog + per-POS-type assignments.
+-- Slugs are prefixed by POS type so the catalog stays collision-free while
+-- each workspace gets its own curated set (admins can reassign later).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  t record;
+  v_item  jsonb;
+  v_slug  text;
+  v_name  text;
+  v_cat_id uuid;
+  v_order int;
+begin
+  for t in
+    select * from (values
+      ('bbq', '[["bbq_grilled_skewers","Grilled Skewers"],["bbq_chicken","Chicken"],["bbq_pork_courses","Pork Courses"],["bbq_rice_meals","Rice Meals"],["bbq_bilao_platters","Bilao & Platters"],["bbq_drinks","Drinks"],["bbq_sides","Sides & Extras"]]'::jsonb),
+      ('retail', '[["retail_apparel","Apparel"],["retail_footwear","Footwear"],["retail_accessories","Accessories"],["retail_gadgets","Gadgets & Electronics"],["retail_school","School Supplies"],["retail_household","Household Items"],["retail_personal_care","Personal Care"]]'::jsonb),
+      ('grocery', '[["grocery_canned_goods","Canned Goods"],["grocery_snacks","Snacks"],["grocery_beverages","Beverages"],["grocery_fresh_produce","Fresh Produce"],["grocery_meat_seafood","Meat & Seafood"],["grocery_dairy","Dairy & Eggs"],["grocery_household","Household & Cleaning"],["grocery_personal_care","Personal Care"]]'::jsonb),
+      ('restaurant', '[["restaurant_appetizers","Appetizers"],["restaurant_soups_salad","Soups & Salads"],["restaurant_main_courses","Main Courses"],["restaurant_rice_noodles","Rice & Noodles"],["restaurant_desserts","Desserts"],["restaurant_beverages","Beverages"],["restaurant_specials","Daily Specials"]]'::jsonb),
+      ('cafe', '[["cafe_hot_coffee","Hot Coffee"],["cafe_cold_coffee","Cold Coffee"],["cafe_milk_tea","Milk Tea"],["cafe_fruit_tea","Fruit Tea & Juice"],["cafe_pastries","Pastries & Snacks"],["cafe_add_ons","Add-ons & Toppings"]]'::jsonb),
+      ('pharmacy', '[["pharmacy_prescription","Prescription Medicines"],["pharmacy_otc","Over-the-Counter"],["pharmacy_vitamins","Vitamins & Supplements"],["pharmacy_first_aid","First Aid"],["pharmacy_medical_devices","Medical Devices"],["pharmacy_personal_care","Personal Care"]]'::jsonb),
+      ('general', '[["general_snacks","Snacks"],["general_beverages","Beverages"],["general_canned_goods","Canned Goods"],["general_household","Household"],["general_school","School Supplies"],["general_personal_care","Personal Care"],["general_sari_sari","Sari-sari Essentials"]]'::jsonb)
+    ) as tp(pos_type_id, cats)
+  loop
+    v_order := 1;
+    for v_item in select * from jsonb_array_elements(t.cats) loop
+      v_slug := v_item ->> 0;
+      v_name := v_item ->> 1;
+
+      insert into public.categories (slug, name, sort_order)
+      values (v_slug, v_name, v_order)
+      on conflict (slug) do nothing;
+
+      select id into v_cat_id from public.categories where slug = v_slug;
+
+      insert into public.pos_type_categories (pos_type_id, category_id, sort_order)
+      values (t.pos_type_id, v_cat_id, v_order)
+      on conflict (pos_type_id, category_id) do nothing;
+
+      v_order := v_order + 1;
+    end loop;
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Subscription plans
 -- ---------------------------------------------------------------------------
 insert into public.subscription_plans

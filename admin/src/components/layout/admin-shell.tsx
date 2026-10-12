@@ -4,6 +4,7 @@ import {
   ChevronDown,
   CreditCard,
   Database,
+  Download,
   History,
   LayoutDashboard,
   Loader2,
@@ -54,6 +55,7 @@ const NAV_SECTIONS: { label: string; items: { to: string; label: string; icon: R
     label: 'System',
     items: [
       { to: '/pos-types', label: 'POS Types', icon: ShoppingBag },
+      { to: '/downloads', label: 'Downloads', icon: Download },
       { to: '/logs', label: 'Activity Logs', icon: History },
       { to: '/settings', label: 'Settings', icon: Settings },
     ],
@@ -67,6 +69,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/subscriptions': 'Subscriptions',
   '/payments': 'Payments',
   '/pos-types': 'POS Types',
+  '/downloads': 'Downloads',
   '/logs': 'Activity Logs',
   '/settings': 'Settings',
 }
@@ -210,7 +213,9 @@ export function AdminShell() {
     setOpen(false)
   }, [location.pathname])
 
-  const pageTitle = PAGE_TITLES[location.pathname] ?? 'Admin'
+  const pageTitle =
+    PAGE_TITLES[location.pathname] ??
+    (location.pathname.startsWith('/pos-types/') ? 'POS Type Categories' : 'Admin')
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

@@ -39,29 +39,6 @@ export function posTypeIcon(name: string | null | undefined): LucideIcon {
   return POS_TYPE_ICONS[name ?? ''] ?? Store
 }
 
-export const POS_TYPE_CATEGORIES = [
-  'food_beverage',
-  'retail',
-  'health',
-  'services',
-  'other',
-] as const
-
-export type PosTypeCategory = (typeof POS_TYPE_CATEGORIES)[number]
-
-export const POS_TYPE_CATEGORY_LABELS: Record<string, string> = {
-  food_beverage: 'Food & Beverage',
-  retail: 'Retail',
-  health: 'Health & Pharmacy',
-  services: 'Services',
-  other: 'Other',
-}
-
-export function posTypeCategoryLabel(id: string | null | undefined): string {
-  if (!id) return 'Uncategorized'
-  return POS_TYPE_CATEGORY_LABELS[id] ?? id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
-}
-
 /* ---------- Plans ---------- */
 
 export const PLAN_LABELS: Record<string, string> = {
@@ -111,8 +88,8 @@ export const LOG_ACTION_GROUPS: { label: string; actions: string[] }[] = [
   { label: 'Subscriptions', actions: ['subscription.create', 'subscription.updated', 'subscription.extend', 'subscription.change_plan', 'subscription.cancel', 'subscription.delete'] },
   { label: 'Payments', actions: ['payment.record', 'payment.recorded', 'payment.status_changed', 'payment.delete'] },
   { label: 'Stores', actions: ['store.create', 'store.status_changed', 'store.delete'] },
-  { label: 'Catalog', actions: ['pos_type.create', 'pos_type.update', 'pos_type.delete', 'plan.create', 'plan.update', 'plan.delete'] },
-  { label: 'System', actions: ['setting.create', 'setting.update', 'system.setup', 'system.seed'] },
+  { label: 'Catalog', actions: ['pos_type.create', 'pos_type.update', 'pos_type.delete', 'plan.create', 'plan.update', 'plan.delete', 'category.create', 'category.update', 'category.delete', 'category.assign', 'category.unassign', 'category.reorder'] },
+  { label: 'System', actions: ['setting.create', 'setting.update', 'system.setup', 'system.seed', 'release.create', 'release.update', 'release.status_changed', 'release.delete'] },
 ]
 
 export const ENTITY_LABELS: Record<string, string> = {
@@ -121,9 +98,11 @@ export const ENTITY_LABELS: Record<string, string> = {
   subscription: 'Subscription',
   payment: 'Payment',
   pos_type: 'POS Type',
+  category: 'Category',
   subscription_plan: 'Plan',
   system_setting: 'Setting',
   system: 'System',
+  pos_release: 'Release',
 }
 
 /* ---------- Pagination ---------- */
