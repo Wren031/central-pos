@@ -21,6 +21,8 @@ import {
   TableWrap,
 } from '@/components/common/states'
 import { PaymentStatusBadge } from '@/components/common/status-badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PaymentRequestsPanel } from './payment-requests-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,6 +51,35 @@ type PaymentRow = Payment & {
 const PAGE_SIZE = 20
 
 export function PaymentsPage() {
+  const [tab, setTab] = React.useState<'transactions' | 'verification'>('verification')
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Payments"
+        description="GCash QR verification queue and the payment ledger."
+      />
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as 'transactions' | 'verification')}
+        className="gap-4"
+      >
+        <TabsList>
+          <TabsTrigger value="verification">Verification queue</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+        </TabsList>
+        <TabsContent value="verification">
+          <PaymentRequestsPanel />
+        </TabsContent>
+        <TabsContent value="transactions">
+          <TransactionsPanel />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+function TransactionsPanel() {
   const [searchInput, setSearchInput] = React.useState('')
   const search = useDebounced(searchInput)
   const [statusFilter, setStatusFilter] = React.useState('all')

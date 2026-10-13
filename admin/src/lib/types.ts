@@ -103,8 +103,40 @@ export interface Subscription {
   plan?: Pick<SubscriptionPlan, 'id' | 'name' | 'duration_days' | 'price' | 'is_trial'> | null
 }
 
-export type PaymentMethod = 'mock_card' | 'mock_gcash' | 'mock_bank' | 'cash'
+export type PaymentMethod = 'mock_card' | 'mock_gcash' | 'mock_bank' | 'cash' | 'gcash_qr'
 export type PaymentStatus = 'succeeded' | 'pending' | 'failed' | 'refunded'
+
+export type PaymentRequestStatus = 'pending' | 'approved' | 'rejected'
+
+/**
+ * A manually-submitted GCash QR payment awaiting admin verification.
+ * Submitting proof NEVER activates a subscription — only
+ * admin_approve_payment_request() does (see supabase/07_payment_requests.sql).
+ */
+export interface PaymentRequest {
+  id: string
+  user_id: string | null
+  client_user_id: string | null
+  submitter_name: string | null
+  submitter_email: string | null
+  business_name: string | null
+  plan_id: string | null
+  amount: number
+  currency: string
+  method: PaymentMethod
+  reference_no: string
+  notes: string | null
+  proof_path: string | null
+  proof_url: string | null
+  status: PaymentRequestStatus
+  rejection_reason: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+  user?: Pick<Profile, 'id' | 'full_name' | 'email' | 'business_name'> | null
+  plan?: Pick<SubscriptionPlan, 'id' | 'name' | 'duration_days' | 'price'> | null
+}
 
 export interface Payment {
   id: string

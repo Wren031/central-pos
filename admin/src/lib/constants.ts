@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type {
   PaymentMethod,
+  PaymentRequestStatus,
   PaymentStatus,
   ProfileStatus,
   SubscriptionStatus,
@@ -79,6 +80,13 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   mock_gcash: 'GCash (mock)',
   mock_bank: 'Bank (mock)',
   cash: 'Cash',
+  gcash_qr: 'GCash QR (manual)',
+}
+
+export const PAYMENT_REQUEST_STATUS_BADGE: Record<PaymentRequestStatus, string> = {
+  pending: 'border-amber-200 bg-amber-50 text-amber-700',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  rejected: 'border-red-200 bg-red-50 text-red-700',
 }
 
 /* ---------- Activity log vocabulary ---------- */
@@ -86,7 +94,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const LOG_ACTION_GROUPS: { label: string; actions: string[] }[] = [
   { label: 'Users', actions: ['user.register', 'user.create', 'user.suspend', 'user.activate', 'user.status_changed', 'user.role_changed', 'admin.promote'] },
   { label: 'Subscriptions', actions: ['subscription.create', 'subscription.updated', 'subscription.extend', 'subscription.change_plan', 'subscription.cancel', 'subscription.delete'] },
-  { label: 'Payments', actions: ['payment.record', 'payment.recorded', 'payment.status_changed', 'payment.delete'] },
+  { label: 'Payments', actions: ['payment.record', 'payment.recorded', 'payment.status_changed', 'payment.delete', 'payment_request.create', 'payment_request.link', 'payment_request.approve', 'payment_request.reject', 'payment_request.delete'] },
   { label: 'Stores', actions: ['store.create', 'store.status_changed', 'store.delete'] },
   { label: 'Catalog', actions: ['pos_type.create', 'pos_type.update', 'pos_type.delete', 'plan.create', 'plan.update', 'plan.delete', 'category.create', 'category.update', 'category.delete', 'category.assign', 'category.unassign', 'category.reorder'] },
   { label: 'System', actions: ['setting.create', 'setting.update', 'system.setup', 'system.seed', 'release.create', 'release.update', 'release.status_changed', 'release.delete'] },
@@ -97,6 +105,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   store: 'Store',
   subscription: 'Subscription',
   payment: 'Payment',
+  payment_request: 'Payment Request',
   pos_type: 'POS Type',
   category: 'Category',
   subscription_plan: 'Plan',

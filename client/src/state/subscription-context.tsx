@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useAuth } from './auth-context'
 import {
   getNotifications,
+  getPaymentRequests,
   getSubState,
   getSubscription,
   getTransactions,
@@ -9,7 +10,14 @@ import {
   purchasePlan,
   subscribeDb,
 } from '@/lib/repos'
-import type { AppNotification, PlanId, SubState, Subscription, Transaction } from '@/lib/types'
+import type {
+  AppNotification,
+  PaymentRequest,
+  PlanId,
+  SubState,
+  Subscription,
+  Transaction,
+} from '@/lib/types'
 
 interface SubscriptionValue {
   sub: Subscription | null
@@ -17,6 +25,7 @@ interface SubscriptionValue {
   notifications: AppNotification[]
   unreadCount: number
   transactions: Transaction[]
+  paymentRequests: PaymentRequest[]
   refresh: () => void
   purchase: (plan: Exclude<PlanId, 'trial'>) => Promise<Subscription>
   markAllRead: () => Promise<void>
@@ -37,6 +46,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   })
   const [notifications, setNotifications] = React.useState<AppNotification[]>([])
   const [transactions, setTransactions] = React.useState<Transaction[]>([])
+  const [paymentRequests, setPaymentRequests] = React.useState<PaymentRequest[]>([])
 
   const refresh = React.useCallback(() => {
     if (!user) {
@@ -51,6 +61,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       })
       setNotifications([])
       setTransactions([])
+      setPaymentRequests([])
       return
     }
     const s = getSubscription(user.id)
@@ -58,6 +69,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     setState(getSubState(user.id))
     setNotifications(getNotifications(user.id))
     setTransactions(getTransactions(user.id))
+    setPaymentRequests(getPaymentRequests(user.id))
   }, [user])
 
   React.useEffect(() => {
@@ -90,8 +102,18 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const unreadCount = notifications.filter((n) => !n.read).length
 
   const value = React.useMemo(
-    () => ({ sub, state, notifications, unreadCount, transactions, refresh, purchase, markAllRead }),
-    [sub, state, notifications, unreadCount, transactions, refresh, purchase, markAllRead]
+    () => ({
+      sub,
+      state,
+      notifications,
+      unreadCount,
+      transactions,
+      paymentRequests,
+      refresh,
+      purchase,
+      markAllRead,
+    }),
+    [sub, state, notifications, unreadCount, transactions, paymentRequests, refresh, purchase, markAllRead]
   )
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>

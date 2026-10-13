@@ -1,7 +1,18 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, CalendarDays, Check, Clock, Crown, Sparkles, Zap } from 'lucide-react'
-import { toast } from 'sonner'
+import {
+  BadgeCheck,
+  CalendarDays,
+  Check,
+  Clock,
+  Crown,
+  FileText,
+  Hourglass,
+  QrCode,
+  Sparkles,
+  XCircle,
+  Zap,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,10 +32,10 @@ import { StatusBadge } from '@/components/common/status-badge'
 import { formatDate, formatDateTime, peso } from '@/lib/format'
 import { PLAN_DAYS, PLAN_LABELS, PLAN_PRICES } from '@/lib/repos'
 import { cn } from '@/lib/utils'
-import type { PlanId } from '@/lib/types'
+import type { PaymentRequest, PaymentRequestStatus, PlanId } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
-import { CheckoutDialog } from './checkout-dialog'
+import { GcashPaymentDialog } from './gcash-payment-dialog'
 
 const PLAN_FEATURES: Record<Exclude<PlanId, 'trial'>, string[]> = {
   weekly: ['Full POS workspace', 'Product catalog & inventory', 'Order history & receipts', 'Email support'],
@@ -49,6 +60,30 @@ const PLAN_META: Record<
   weekly: { icon: Zap, blurb: 'Try a plan week-to-week' },
   monthly: { icon: BadgeCheck, highlight: true, blurb: 'Most popular for small stores' },
   yearly: { icon: Crown, blurb: 'Best value — save ₱989' },
+}
+
+const REQUEST_STATUS: Record<PaymentRequestStatus, { label: string; className: string }> = {
+  pending: {
+    label: 'Pending Verification',
+    className: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+  approved: {
+    label: 'Approved',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  rejected: {
+    label: 'Rejected',
+    className: 'border-red-200 bg-red-50 text-red-700',
+  },
+}
+
+function PaymentRequestStatusBadge({ status }: { status: PaymentRequestStatus }) {
+  const cfg = REQUEST_STATUS[status]
+  return (
+    <Badge variant="outline" className={cn('font-medium', cfg.className)}>
+      {cfg.label}
+    </Badge>
+  )
 }
 
 function TrialPanel() {
@@ -101,24 +136,32 @@ function TrialPanel() {
   )
 }
 
+function PendingBanner({ request }: { request: PaymentRequest }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <Hourglass className="size-4 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">
+          GCash payment pending verification — {PLAN_LABELS[request.plan]} plan
+        </p>
+        <p className="text-xs text-amber-700/90">
+          Reference <span className="font-mono">{request.referenceNo}</span> · submitted{' '}
+          {formatDateTime(request.createdAt)}. Your plan activates once an administrator approves it.
+        </p>
+      </div>
+      <PaymentRequestStatusBadge status="pending" />
+    </div>
+  )
+}
+
 export function SubscriptionPage() {
   const { user } = useAuth()
-  const { sub, state, transactions, purchase } = useSubscription()
+  const { sub, state, transactions, paymentRequests } = useSubscription()
   const [checkoutPlan, setCheckoutPlan] = React.useState<Exclude<PlanId, 'trial'> | null>(null)
   const [checkoutOpen, setCheckoutOpen] = React.useState(false)
-  const [busy, setBusy] = React.useState<Exclude<PlanId, 'trial'> | null>(null)
 
   const subTransactions = transactions.filter((t) => t.type === 'subscription')
-
-  async function handlePurchase(plan: Exclude<PlanId, 'trial'>) {
-    setBusy(plan)
-    try {
-      await purchase(plan)
-      toast.success(`${PLAN_LABELS[plan]} plan activated!`)
-    } finally {
-      setBusy(null)
-    }
-  }
+  const pendingRequest = paymentRequests.find((r) => r.status === 'pending') ?? null
 
   function openCheckout(plan: Exclude<PlanId, 'trial'>) {
     setCheckoutPlan(plan)
@@ -129,7 +172,7 @@ export function SubscriptionPage() {
     <div className="w-full space-y-6 p-4 sm:p-6">
       <PageHeader
         title="Subscription & billing"
-        description="Manage your plan, view billing history, and control renewals."
+        description="Choose a plan, pay manually via GCash, and track your payment verification."
         actions={
           state.status === 'expired' ? (
             <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
@@ -138,6 +181,8 @@ export function SubscriptionPage() {
           ) : undefined
         }
       />
+
+      {pendingRequest && <PendingBanner request={pendingRequest} />}
 
       {sub && (
         <Card className="shadow-none">
@@ -171,6 +216,20 @@ export function SubscriptionPage() {
               </div>
             </div>
           </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Current plan</p>
+              <p className="text-sm font-medium">{PLAN_LABELS[sub.plan]}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Start date</p>
+              <p className="text-sm font-medium">{formatDate(sub.startedAt)}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Expiration date</p>
+              <p className="text-sm font-medium">{formatDate(sub.expiresAt)}</p>
+            </div>
+          </CardContent>
         </Card>
       )}
 
@@ -180,6 +239,10 @@ export function SubscriptionPage() {
         <h2 id="plans-heading" className="mb-3 text-lg font-semibold tracking-tight">
           Choose a plan
         </h2>
+        <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <QrCode className="size-3.5" aria-hidden />
+          Pay manually via GCash QR — a pending request is created for admin verification.
+        </p>
         <div className="mt-2 grid gap-4 md:grid-cols-3">
           {(['weekly', 'monthly', 'yearly'] as const).map((plan) => {
             const meta = PLAN_META[plan]
@@ -243,21 +306,21 @@ export function SubscriptionPage() {
                   <Button
                     className="w-full"
                     variant={meta.highlight ? 'default' : 'outline'}
-                    disabled={isCurrent || busy !== null}
+                    disabled={isCurrent}
                     onClick={() => openCheckout(plan)}
                   >
                     {isCurrent ? (
                       <>
                         <BadgeCheck className="size-4" /> Current plan
                       </>
-                    ) : busy === plan ? (
-                      'Processing…'
                     ) : state.status === 'expired' ? (
                       <>
                         <Clock className="size-4" /> Renew with {PLAN_LABELS[plan]}
                       </>
                     ) : (
-                      `Choose ${PLAN_LABELS[plan]}`
+                      <>
+                        <QrCode className="size-4" /> Pay {PLAN_LABELS[plan]} via GCash
+                      </>
                     )}
                   </Button>
                 </CardFooter>
@@ -267,11 +330,72 @@ export function SubscriptionPage() {
         </div>
       </section>
 
-      <p className="text-xs text-muted-foreground">
-        After expiry: selling and checkout are locked, but your products, inventory, orders, and
-        reports remain fully accessible.{' '}
-        {user && <Link to="/profile" className="underline underline-offset-2">Account settings</Link>}
-      </p>
+      <section aria-labelledby="requests-heading">
+        <h2 id="requests-heading" className="mb-3 text-lg font-semibold tracking-tight">
+          Payment requests
+        </h2>
+        <Card className="shadow-none">
+          <CardContent className="p-0">
+            {paymentRequests.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No payment requests yet"
+                description="When you submit a GCash payment, it appears here awaiting verification."
+                className="border-0"
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead className="hidden sm:table-cell">Submitted</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentRequests.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <p className="font-mono text-xs">{r.referenceNo}</p>
+                          {r.notes && (
+                            <p className="max-w-[16rem] truncate text-[11px] text-muted-foreground">
+                              {r.notes}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">{PLAN_LABELS[r.plan]}</TableCell>
+                        <TableCell className="hidden text-muted-foreground sm:table-cell">
+                          {formatDateTime(r.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <PaymentRequestStatusBadge status={r.status} />
+                            {r.status === 'approved' && (
+                              <p className="text-[11px] text-emerald-700">
+                                Approved {r.reviewedAt ? formatDate(r.reviewedAt) : ''}
+                              </p>
+                            )}
+                            {r.status === 'rejected' && r.rejectionReason && (
+                              <p className="flex items-start gap-1 text-[11px] text-red-600">
+                                <XCircle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                                {r.rejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{peso(r.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <section aria-labelledby="billing-heading">
         <h2 id="billing-heading" className="mb-3 text-lg font-semibold tracking-tight">
@@ -283,7 +407,7 @@ export function SubscriptionPage() {
               <EmptyState
                 icon={Clock}
                 title="No payments yet"
-                description="You are on the free trial. Your first payment will appear here after you choose a plan."
+                description="You are on the free trial. Your first approved payment will appear here."
                 className="border-0"
               />
             ) : (
@@ -322,11 +446,16 @@ export function SubscriptionPage() {
         </Card>
       </section>
 
-      <CheckoutDialog
+      <p className="text-xs text-muted-foreground">
+        After expiry: selling and checkout are locked, but your products, inventory, orders, and
+        reports remain fully accessible.{' '}
+        {user && <Link to="/profile" className="underline underline-offset-2">Account settings</Link>}
+      </p>
+
+      <GcashPaymentDialog
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         plan={checkoutPlan}
-        onPurchase={handlePurchase}
         currentExpiry={state.canSell ? state.expiresAt : null}
       />
     </div>

@@ -46,6 +46,29 @@ export interface Subscription {
   active: boolean
 }
 
+export type PaymentRequestStatus = 'pending' | 'approved' | 'rejected'
+
+/**
+ * A manually-submitted GCash QR payment proof. Submitting it NEVER activates
+ * or extends the subscription locally — only an administrator approving the
+ * request (mirrored from the Supabase backend) changes the subscription.
+ */
+export interface PaymentRequest {
+  id: string
+  userId: string
+  plan: Exclude<PlanId, 'trial'>
+  amount: number
+  /** Customer-entered GCash transaction reference number. */
+  referenceNo: string
+  notes: string
+  /** Compressed data URL of the uploaded receipt screenshot, if any. */
+  proofImage: string | null
+  status: PaymentRequestStatus
+  rejectionReason: string | null
+  createdAt: string
+  reviewedAt: string | null
+}
+
 export interface Product {
   id: string
   storeId: string
@@ -100,7 +123,15 @@ export interface Transaction {
 export interface AppNotification {
   id: string
   userId: string
-  kind: 'trial_ending' | 'expiring' | 'expired' | 'renewed' | 'welcome'
+  kind:
+    | 'trial_ending'
+    | 'expiring'
+    | 'expired'
+    | 'renewed'
+    | 'welcome'
+    | 'payment_submitted'
+    | 'payment_approved'
+    | 'payment_rejected'
   title: string
   body: string
   read: boolean
@@ -166,6 +197,7 @@ export type SyncEntity =
   | 'subscription'
   | 'notification'
   | 'printerSettings'
+  | 'paymentRequest'
 
 export type SyncOperationStatus = 'pending' | 'syncing' | 'synced' | 'failed'
 
@@ -311,6 +343,7 @@ export interface Database {
   orders: Order[]
   transactions: Transaction[]
   notifications: AppNotification[]
+  paymentRequests: PaymentRequest[]
   session: Session | null
 }
 

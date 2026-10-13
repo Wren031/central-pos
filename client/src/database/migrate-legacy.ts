@@ -19,6 +19,7 @@ function readLegacy(): Database | null {
       orders: parsed.orders ?? [],
       transactions: parsed.transactions ?? [],
       notifications: parsed.notifications ?? [],
+      paymentRequests: [],
       session: parsed.session ?? null,
     }
   } catch {

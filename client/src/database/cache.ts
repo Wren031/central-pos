@@ -3,6 +3,7 @@ import type {
   Category,
   Customer,
   Order,
+  PaymentRequest,
   Product,
   Session,
   StockMovement,
@@ -28,6 +29,7 @@ export interface CacheState {
   transactions: Transaction[]
   subscriptions: Subscription[]
   notifications: AppNotification[]
+  paymentRequests: PaymentRequest[]
   stockMovements: StockMovement[]
 }
 
@@ -42,6 +44,7 @@ export const EMPTY_CACHE: CacheState = {
   transactions: [],
   subscriptions: [],
   notifications: [],
+  paymentRequests: [],
   stockMovements: [],
 }
 

@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { CreditCard, Loader2, Pencil, Plus, Save, SlidersHorizontal, UserCog } from 'lucide-react'
+import { CreditCard, Loader2, Pencil, Plus, QrCode, Save, SlidersHorizontal, UploadCloud, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAsync } from '@/hooks/use-async'
 import { errorMessage } from '@/lib/errors'
 import { formatDate, peso } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { fetchGcashQrUrl, setGcashQrFromFile, setGcashQrUrl } from '@/lib/payment-requests'
 import type { SubscriptionPlan, SystemSetting } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 import { PageHeader } from '@/components/common/page-header'
@@ -26,11 +27,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
-type TabId = 'general' | 'plans' | 'profile'
+type TabId = 'general' | 'plans' | 'payments' | 'profile'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'System', icon: SlidersHorizontal },
   { id: 'plans', label: 'Subscription plans', icon: CreditCard },
+  { id: 'payments', label: 'GCash payments', icon: QrCode },
   { id: 'profile', label: 'Admin profile', icon: UserCog },
 ]
 
@@ -58,6 +60,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="plans">
           <PlansTab />
+        </TabsContent>
+        <TabsContent value="payments">
+          <PaymentsTab />
         </TabsContent>
         <TabsContent value="profile">
           <ProfileTab />
@@ -112,6 +117,7 @@ function GeneralTab() {
     const { data, error } = await supabase
       .from('system_settings')
       .select('*')
+      .neq('key', 'gcash_qr')
       .order('key')
     if (error) throw new Error(errorMessage(error))
     return (data ?? []) as SystemSetting[]
@@ -697,6 +703,147 @@ function ProfileTab() {
             Change password
           </Button>
         </form>
+      </Card>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* GCash payments                                                      */
+/* ------------------------------------------------------------------ */
+
+function PaymentsTab() {
+  const [busy, setBusy] = React.useState(false)
+  const [urlDraft, setUrlDraft] = React.useState('')
+  const [loadedUrl, setLoadedUrl] = React.useState('')
+
+  const qr = useAsync(async () => {
+    const url = await fetchGcashQrUrl()
+    setLoadedUrl(url)
+    setUrlDraft(url)
+    return url
+  }, [])
+
+  async function upload(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('The QR code must be an image file.')
+      return
+    }
+    setBusy(true)
+    try {
+      const url = await setGcashQrFromFile(file)
+      setLoadedUrl(url)
+      setUrlDraft(url)
+      toast.success('GCash QR code updated.')
+      qr.reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveUrl() {
+    setBusy(true)
+    try {
+      await setGcashQrUrl(urlDraft)
+      setLoadedUrl(urlDraft.trim())
+      toast.success('GCash QR URL saved.')
+      qr.reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (qr.loading) return <LoadingRows rows={4} cols={2} />
+  if (qr.error) return <ErrorState message={qr.error} onRetry={qr.reload} />
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card
+        title="GCash QR code"
+        description="Customers scan this on the POS subscription page to pay manually."
+      >
+        <div className="space-y-4">
+          <div className="flex min-h-52 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-3">
+            {loadedUrl ? (
+              <img
+                src={loadedUrl}
+                alt="GCash QR code"
+                className="max-h-64 w-auto rounded-md object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
+                <QrCode className="size-8" />
+                <p className="text-sm font-medium">No QR code configured</p>
+                <p className="max-w-xs text-xs">
+                  Upload your real GCash QR image below. The POS client shows a “not configured”
+                  notice until then — it never generates a fake QR.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Upload QR image</Label>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              className="flex w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
+              onChange={(e) => void upload(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-[11px] text-muted-foreground/70">
+              Uploaded to the public <code className="rounded bg-muted px-1 py-0.5">payment-assets</code>{' '}
+              bucket and shown to customers.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Or set an image URL"
+        description="Point the QR at an image hosted elsewhere (advanced)."
+      >
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>GCash QR image URL</Label>
+            <Input
+              type="url"
+              placeholder="https://…/gcash-qr.png"
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || urlDraft.trim() === loadedUrl.trim()}
+              onClick={() => void saveUrl()}
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-3.5" />}
+              Save URL
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy || !urlDraft}
+              onClick={() => setUrlDraft('')}
+            >
+              Clear
+            </Button>
+          </div>
+          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-700">
+            <UploadCloud className="mr-1 inline size-3.5" />
+            Clearing the URL and saving removes the QR from the client (customers see the “not
+            configured” notice). No payment gateway is connected anywhere.
+          </div>
+        </div>
       </Card>
     </div>
   )

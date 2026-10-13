@@ -5,6 +5,7 @@ import type {
   Customer,
   Order,
   OrderItemRecord,
+  PaymentRequest,
   PosConfigRecord,
   PosTypeId,
   PrinterSettings,
@@ -33,6 +34,7 @@ export class CposDatabase extends Dexie {
   transactions!: EntityTable<Transaction, 'id'>
   subscriptions!: EntityTable<Subscription, 'id'>
   notifications!: EntityTable<AppNotification, 'id'>
+  paymentRequests!: EntityTable<PaymentRequest, 'id'>
   syncQueue!: EntityTable<SyncOperation, 'id'>
   syncMeta!: EntityTable<SyncMetaRow, 'key'>
   printerSettings!: EntityTable<PrinterSettings, 'storeId'>
@@ -56,6 +58,9 @@ export class CposDatabase extends Dexie {
       syncQueue: 'id, idempotencyKey, entity, entityId, storeId, status, createdAt',
       syncMeta: 'key',
       printerSettings: 'storeId',
+    })
+    this.version(2).stores({
+      paymentRequests: 'id, userId, status, createdAt',
     })
   }
 }

@@ -44,6 +44,13 @@ export {
 } from '@/database/repos/subscription'
 
 export {
+  getPaymentRequests,
+  getPendingPaymentRequest,
+  submitPaymentRequest,
+  applyPaymentReview,
+} from '@/database/repos/payment-requests'
+
+export {
   getNotifications,
   markNotificationsRead,
   syncSubscriptionNotifications,

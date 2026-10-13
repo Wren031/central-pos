@@ -1,11 +1,17 @@
 import { cn } from '@/lib/utils'
 import {
+  PAYMENT_REQUEST_STATUS_BADGE,
   PAYMENT_STATUS_BADGE,
   PROFILE_STATUS_BADGE,
   SUB_STATUS_BADGE,
   planLabel,
 } from '@/lib/constants'
-import type { PaymentStatus, ProfileStatus, SubscriptionStatus } from '@/lib/types'
+import type {
+  PaymentRequestStatus,
+  PaymentStatus,
+  ProfileStatus,
+  SubscriptionStatus,
+} from '@/lib/types'
 
 const PILL =
   'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none'
@@ -29,6 +35,19 @@ export function ProfileStatusBadge({ status }: { status: ProfileStatus }) {
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   return (
     <span className={cn(PILL, PAYMENT_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600')}>
+      {status}
+    </span>
+  )
+}
+
+export function PaymentRequestStatusBadge({ status }: { status: PaymentRequestStatus }) {
+  return (
+    <span
+      className={cn(
+        PILL,
+        PAYMENT_REQUEST_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600'
+      )}
+    >
       {status}
     </span>
   )
