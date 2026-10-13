@@ -36,8 +36,7 @@ async function syncPillText() {
 try {
   // 1. Register a fresh account (no demo account exists)
   await page.goto(BASE + '/register', { waitUntil: 'networkidle' })
-  await page.fill('input[name="firstName"]', 'Offline')
-  await page.fill('input[name="lastName"]', 'Tester')
+  await page.fill('input[name="fullName"]', 'Offline Tester')
   await page.fill('textarea', '12 Test Street, Quezon City, Metro Manila')
   await page.fill('input[placeholder="09171234567"]', '09171234567')
   await page.fill('input[placeholder="Clara\'s Carinderia"]', 'Offline Test Store')

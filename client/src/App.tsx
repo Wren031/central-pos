@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
-import { DemoClock } from '@/components/common/demo-clock'
 import { DatabaseGate } from '@/components/common/database-gate'
 import { AppShell } from '@/components/layout/app-shell'
 import { LoginPage } from '@/features/auth/login-page'
@@ -75,7 +74,6 @@ export default function App() {
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFoundPage />} />
               </Routes>
-                <DemoClock />
                 <Toaster position="top-center" richColors closeButton />
               </CartProvider>
             </SubscriptionProvider>

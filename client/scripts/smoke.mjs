@@ -30,8 +30,7 @@ try {
   // 2. Register a new user
   await page.click('text=Register free for 30 days')
   await page.waitForSelector('text=Create your account')
-  await page.fill('input[name="firstName"]', 'Ana')
-  await page.fill('input[name="lastName"]', 'Reyes')
+  await page.fill('input[name="fullName"]', 'Ana Reyes')
   await page.fill('textarea', '78 Sampaguita Street, Brgy. Bagong Silangan, Quezon City, Metro Manila')
   await page.fill('input[placeholder="09171234567"]', '09171234567')
   await page.fill('input[placeholder="Clara\'s Carinderia"]', "Ana's Eatery")
@@ -114,13 +113,12 @@ try {
   ok('subscription checkout success')
   await page.keyboard.press('Escape')
 
-  // 11. Demo clock advance 60 days → expired (trial 30d + weekly 7d ≈ 37d)
-  await page.click('button[aria-label="Toggle demo time controls"]')
-  await page.click('button:has-text("+30 days")')
-  await page.click('button:has-text("+30 days")')
-  await page.waitForTimeout(800)
-  await page.keyboard.press('Escape')
-  ok('demo clock advanced')
+  // 11. Advance clock 60 days via mock-clock offset → expired (trial 30d + weekly 7d ≈ 37d)
+  await page.evaluate(() =>
+    localStorage.setItem('cpos:v1:clock-offset-ms', String(60 * 24 * 60 * 60 * 1000))
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+  ok('clock advanced 60 days')
 
   // 12. Catalog should show locked banner
   await page.goto(BASE + '/pos/catalog', { waitUntil: 'networkidle' })

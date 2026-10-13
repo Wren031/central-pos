@@ -23,9 +23,7 @@ import { OtpVerifyStep } from './otp-verify-step'
 
 const schema = z
   .object({
-    firstName: z.string().min(1, 'First name is required.'),
-    middleName: z.string().optional(),
-    lastName: z.string().min(1, 'Last name is required.'),
+    fullName: z.string().min(2, 'Full name is required.'),
     address: z.string().min(10, 'Enter the store address (street, barangay, city/province).'),
     contactNumber: z
       .string()
@@ -141,9 +139,7 @@ export function RegisterPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      firstName: '',
-      middleName: '',
-      lastName: '',
+      fullName: '',
       address: '',
       contactNumber: '',
       businessName: '',
@@ -168,12 +164,8 @@ export function RegisterPage() {
   async function handleVerified() {
     const values = pendingValues.current
     if (!values) return
-    const fullName = [values.firstName, values.middleName, values.lastName]
-      .map((part) => (part ?? '').trim())
-      .filter(Boolean)
-      .join(' ')
     await register({
-      fullName,
+      fullName: values.fullName.trim(),
       address: values.address,
       contactNumber: values.contactNumber,
       businessName: values.businessName,
@@ -225,56 +217,28 @@ export function RegisterPage() {
           <StepIndicator current={1} />
       <Form {...form} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <SectionLabel>Owner</SectionLabel>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>First name</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <InputIcon icon={User} />
-                      <Input
-                        placeholder="Juan"
-                        autoComplete="given-name"
-                        autoFocus
-                        className="pl-9"
-                        {...field}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="middleName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Middle name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Optional" autoComplete="additional-name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Dela Cruz" autoComplete="family-name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="fullName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full name</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <InputIcon icon={User} />
+                    <Input
+                      placeholder="Juan Dela Cruz"
+                      autoComplete="name"
+                      autoFocus
+                      className="pl-9"
+                      {...field}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="contactNumber"
