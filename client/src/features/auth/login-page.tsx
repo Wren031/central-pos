@@ -132,7 +132,7 @@ export function LoginPage() {
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="absolute top-1/2 right-1 -translate-y-1/2"
+                      className="absolute inset-y-0 right-1 my-auto"
                       onClick={() => setShowPassword((v) => !v)}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
