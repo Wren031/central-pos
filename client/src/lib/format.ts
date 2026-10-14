@@ -14,6 +14,13 @@ export function pesoShort(amount: number): string {
   return `₱${amount.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`
 }
 
+export function pesoCompact(amount: number): string {
+  const abs = Math.abs(amount)
+  if (abs >= 1_000_000) return `₱${(amount / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
+  if (abs >= 1_000) return `₱${(amount / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`
+  return `₱${Math.round(amount).toLocaleString('en-PH')}`
+}
+
 export function formatDate(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso
   return d.toLocaleDateString('en-PH', {

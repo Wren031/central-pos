@@ -2,6 +2,8 @@ import * as React from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
   CreditCard,
   Grid2X2,
   Package,
@@ -15,20 +17,26 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/empty-state'
+import { SalesLineChart } from '@/components/common/sales-line-chart'
 import { StatCard } from '@/components/common/stat-card'
+import { TopProductsBarChart } from '@/components/common/top-products-bar-chart'
 import { mockClock, addDays } from '@/lib/mock-clock'
 import { peso } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { productImage } from '@/lib/mock-image'
 import { getPosType } from '@/lib/pos-types'
 import { getOrders, getProducts } from '@/lib/repos'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 
-function last7Days(orders: { createdAt: string; total: number; paymentStatus: string }[]) {
+function last7Days(
+  orders: { createdAt: string; total: number; paymentStatus: string }[],
+  offsetDays = 0,
+) {
   const now = mockClock.now()
-  const days: { label: string; total: number; count: number }[] = []
+  const days: { label: string; dateLabel: string; total: number; count: number }[] = []
   for (let i = 6; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offsetDays - i)
     const end = addDays(start, 1)
     const inDay = orders.filter((o) => {
       const t = new Date(o.createdAt).getTime()
@@ -36,6 +44,7 @@ function last7Days(orders: { createdAt: string; total: number; paymentStatus: st
     })
     days.push({
       label: start.toLocaleDateString('en-PH', { weekday: 'short' }),
+      dateLabel: start.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }),
       total: inDay.reduce((s, o) => s + o.total, 0),
       count: inDay.length,
     })
@@ -49,11 +58,21 @@ export function PosOverviewPage() {
   const [stats, setStats] = React.useState<{
     todaySales: number
     todayOrders: number
-    week: { label: string; total: number; count: number }[]
+    week: { label: string; dateLabel: string; total: number; count: number }[]
+    weekTotal: number
+    prevWeekTotal: number
     lowStock: { id: string; name: string; stock: number; emoji: string; image?: string }[]
     unpaidTotal: number
     productCount: number
-    topProducts: { name: string; qty: number; revenue: number }[]
+    topProducts: {
+      productId: string
+      name: string
+      qty: number
+      revenue: number
+      emoji: string
+      image?: string
+      rank: number
+    }[]
     orders: Awaited<ReturnType<typeof getOrders>>
   } | null>(null)
 
@@ -65,19 +84,34 @@ export function PosOverviewPage() {
       const now = mockClock.now()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
       const today = orders.filter((o) => new Date(o.createdAt).getTime() >= todayStart)
-      const qtyMap = new Map<string, { name: string; qty: number; revenue: number }>()
+      const productById = new Map(products.map((p) => [p.id, p]))
+      const qtyMap = new Map<
+        string,
+        { name: string; qty: number; revenue: number; emoji: string; image?: string }
+      >()
       for (const o of orders) {
         for (const it of o.items) {
-          const entry = qtyMap.get(it.productId) ?? { name: it.name, qty: 0, revenue: 0 }
+          const product = productById.get(it.productId)
+          const entry = qtyMap.get(it.productId) ?? {
+            name: it.name,
+            qty: 0,
+            revenue: 0,
+            emoji: product?.emoji ?? '🛍️',
+            image: product?.image,
+          }
           entry.qty += it.qty
           entry.revenue += it.qty * it.price
           qtyMap.set(it.productId, entry)
         }
       }
+      const week = last7Days(orders)
+      const prevWeek = last7Days(orders, 7)
       setStats({
         todaySales: today.reduce((s, o) => s + o.total, 0),
         todayOrders: today.length,
-        week: last7Days(orders),
+        week,
+        weekTotal: week.reduce((s, d) => s + d.total, 0),
+        prevWeekTotal: prevWeek.reduce((s, d) => s + d.total, 0),
         lowStock: products
           .filter((p) => p.stock <= 10)
           .sort((a, b) => a.stock - b.stock)
@@ -85,7 +119,11 @@ export function PosOverviewPage() {
           .map((p) => ({ id: p.id, name: p.name, stock: p.stock, emoji: p.emoji, image: p.image })),
         unpaidTotal: orders.filter((o) => o.paymentStatus === 'unpaid').reduce((s, o) => s + o.total, 0),
         productCount: products.length,
-        topProducts: [...qtyMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5),
+        topProducts: [...qtyMap.entries()]
+          .map(([productId, v]) => ({ productId, ...v }))
+          .sort((a, b) => b.qty - a.qty)
+          .slice(0, 10)
+          .map((p, i) => ({ ...p, rank: i + 1 })),
         orders,
       })
     }
@@ -114,7 +152,10 @@ export function PosOverviewPage() {
 
   const posDef = getPosType(store.posType)
   const accent = posDef.theme.accent
-  const maxWeek = stats ? Math.max(...stats.week.map((d) => d.total), 1) : 1
+  const weekTrend =
+    stats && stats.prevWeekTotal > 0
+      ? ((stats.weekTotal - stats.prevWeekTotal) / stats.prevWeekTotal) * 100
+      : null
 
   return (
     <div className="w-full space-y-6 p-4 sm:p-6">
@@ -179,28 +220,35 @@ export function PosOverviewPage() {
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="shadow-none lg:col-span-2">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Last 7 days sales</CardTitle>
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                  <div>
+                    <CardTitle className="text-sm">Last 7 days sales</CardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">Daily revenue this week</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold tabular-nums">{peso(stats.weekTotal)}</p>
+                    {weekTrend === null ? (
+                      <p className="text-xs text-muted-foreground">No prior week to compare</p>
+                    ) : (
+                      <p
+                        className={cn(
+                          'flex items-center justify-end gap-0.5 text-xs font-medium tabular-nums',
+                          weekTrend >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                        )}
+                      >
+                        {weekTrend >= 0 ? (
+                          <ArrowUpRight className="size-3.5" aria-hidden />
+                        ) : (
+                          <ArrowDownRight className="size-3.5" aria-hidden />
+                        )}
+                        {Math.abs(weekTrend).toFixed(1)}% vs last week
+                      </p>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex h-40 items-end gap-2" role="img" aria-label="Bar chart of the last 7 days of sales">
-                  {stats.week.map((d) => (
-                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {d.total > 0 ? peso(d.total).replace('.00', '') : '—'}
-                      </span>
-                      <div
-                        className="w-full rounded-t-md transition-all"
-                        style={{
-                          height: `${Math.max(4, (d.total / maxWeek) * 100)}%`,
-                          backgroundColor: accent,
-                          opacity: d.total === 0 ? 0.2 : 0.9,
-                        }}
-                        title={`${d.label}: ${peso(d.total)} (${d.count} orders)`}
-                      />
-                      <span className="text-[10px] text-muted-foreground">{d.label}</span>
-                    </div>
-                  ))}
-                </div>
+                <SalesLineChart data={stats.week} accent={accent} />
               </CardContent>
             </Card>
 
@@ -243,36 +291,18 @@ export function PosOverviewPage() {
 
           <Card className="shadow-none">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Top selling products (all time)</CardTitle>
+              <div>
+                <CardTitle className="text-sm">Top selling products</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Top 10 · units sold · all time</p>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
               {stats.topProducts.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   No sales recorded yet — ring up your first order.
                 </p>
               ) : (
-                stats.topProducts.map((p, i) => {
-                  const max = stats.topProducts[0].qty || 1
-                  return (
-                    <div key={p.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">
-                          <span className="mr-2 text-muted-foreground">#{i + 1}</span>
-                          {p.name}
-                        </span>
-                        <span className="tabular-nums text-muted-foreground">
-                          {p.qty} sold · {peso(p.revenue)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${(p.qty / max) * 100}%`, backgroundColor: accent }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })
+                <TopProductsBarChart data={stats.topProducts} accent={accent} />
               )}
             </CardContent>
           </Card>
