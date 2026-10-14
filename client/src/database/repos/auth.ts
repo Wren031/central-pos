@@ -5,29 +5,34 @@ import { hashPassword, isPbkdf2Hash, legacyEncode, verifyPassword } from '../aut
 import { PLAN_PRICES, PLAN_DAYS } from '@/lib/plan-constants'
 import { mockClock } from '@/lib/mock-clock'
 import { latency, newId, nowIso, syncOpFor, putSyncOp } from './helpers'
-import type { NotificationPrefs, PosTypeId, Store, Subscription, User } from '@/lib/types'
+import type { NotificationPrefs, PendingRegistration, PosTypeId, Store, Subscription, User } from '@/lib/types'
 
 /* ---------- users & session ---------- */
 
-export async function registerUser(input: {
+/** PBKDF2-hash a password, degrading gracefully if Web Crypto is unavailable. */
+async function hashPasswordSafe(password: string): Promise<string> {
+  try {
+    return await hashPassword(password)
+  } catch {
+    return legacyEncode(password)
+  }
+}
+
+/**
+ * Creates the local user + 30-day free trial + welcome notification + session.
+ * Shared by direct registration and by finalizing a pending (link-confirmed)
+ * registration, which already has a precomputed password hash.
+ */
+async function createLocalAccount(input: {
   fullName: string
   address: string
   contactNumber: string
   businessName: string
   email: string
-  password: string
+  passwordHash: string
 }): Promise<User> {
-  await latency()
   const email = input.email.trim().toLowerCase()
-  const existing = await db.users.where('email').equals(email).first()
-  if (existing) throw new Error('An account with this email already exists.')
   const now = nowIso()
-  let passwordHash: string
-  try {
-    passwordHash = await hashPassword(input.password)
-  } catch {
-    passwordHash = legacyEncode(input.password)
-  }
   const user: User = {
     id: newId('usr'),
     fullName: input.fullName.trim(),
@@ -35,7 +40,7 @@ export async function registerUser(input: {
     contactNumber: input.contactNumber.trim(),
     businessName: input.businessName.trim(),
     email,
-    passwordHash,
+    passwordHash: input.passwordHash,
     notificationPrefs: { expiration: true, reminders: true, marketing: false },
     createdAt: now,
   }
@@ -70,6 +75,93 @@ export async function registerUser(input: {
     for (const op of ops) await putSyncOp(op)
   })
   await refreshCacheForUser(user.id)
+  return user
+}
+
+export async function registerUser(input: {
+  fullName: string
+  address: string
+  contactNumber: string
+  businessName: string
+  email: string
+  password: string
+}): Promise<User> {
+  await latency()
+  const email = input.email.trim().toLowerCase()
+  const existing = await db.users.where('email').equals(email).first()
+  if (existing) throw new Error('An account with this email already exists.')
+  const passwordHash = await hashPasswordSafe(input.password)
+  return createLocalAccount({ ...input, email, passwordHash })
+}
+
+/* ---------- pending (email-link) registrations ---------- */
+
+/**
+ * Stages a registration while the user confirms their email via the Supabase
+ * confirmation link. The password is hashed here — no plaintext is stored.
+ */
+export async function stagePendingRegistration(input: {
+  fullName: string
+  address: string
+  contactNumber: string
+  businessName: string
+  email: string
+  password: string
+}): Promise<void> {
+  const email = input.email.trim().toLowerCase()
+  const passwordHash = await hashPasswordSafe(input.password)
+  await db.pendingRegistrations.put({
+    email,
+    fullName: input.fullName.trim(),
+    address: input.address.trim(),
+    contactNumber: input.contactNumber.trim(),
+    businessName: input.businessName.trim(),
+    passwordHash,
+    createdAt: nowIso(),
+  })
+}
+
+export async function getPendingRegistration(
+  email: string
+): Promise<PendingRegistration | undefined> {
+  return db.pendingRegistrations.get(email.trim().toLowerCase())
+}
+
+export async function clearPendingRegistration(email: string): Promise<void> {
+  await db.pendingRegistrations.delete(email.trim().toLowerCase())
+}
+
+/**
+ * Finalizes a staged registration after Supabase confirms the email. Creates
+ * the local account + trial (once) and signs the user in. Returns null when
+ * there is no staged registration (e.g. confirmed on another device) — the
+ * caller routes the user to sign in.
+ */
+export async function finalizePendingRegistration(email: string): Promise<User | null> {
+  const normalized = email.trim().toLowerCase()
+  const pending = await db.pendingRegistrations.get(normalized)
+  if (!pending) return null
+
+  const existing = await db.users.where('email').equals(normalized).first()
+  if (existing) {
+    // Account already finalized earlier — just start a session, no duplicate.
+    await db.transaction('rw', db.sessions, db.pendingRegistrations, async () => {
+      await db.sessions.put({ id: 'current', userId: existing.id, loggedInAt: nowIso() })
+      await db.pendingRegistrations.delete(normalized)
+    })
+    await refreshCacheForUser(existing.id)
+    return existing
+  }
+
+  const user = await createLocalAccount({
+    email: normalized,
+    fullName: pending.fullName,
+    address: pending.address,
+    contactNumber: pending.contactNumber,
+    businessName: pending.businessName,
+    passwordHash: pending.passwordHash,
+  })
+  await clearPendingRegistration(normalized)
   return user
 }
 
@@ -109,6 +201,13 @@ export function getCurrentUser(): User | null {
   const cache = getCache()
   if (!cache.session) return null
   return cache.users.find((u) => u.id === cache.session!.userId) ?? null
+}
+
+/** True when a LOCAL account already exists for this email. */
+export async function isEmailRegistered(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase()
+  const found = await db.users.where('email').equals(normalized).first()
+  return Boolean(found)
 }
 
 export async function updateProfile(

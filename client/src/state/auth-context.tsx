@@ -8,6 +8,7 @@ import {
   subscribeDb,
   syncSubscriptionNotifications,
 } from '@/lib/repos'
+import { healLocalAccountViaSupabase } from '@/services/supabase-account'
 import type { Store, User } from '@/lib/types'
 
 interface AuthValue {
@@ -54,11 +55,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refresh])
 
-  const login = React.useCallback(async (email: string, password: string) => {
-    const u = await repoLogin(email, password)
-    refresh()
-    return u
-  }, [refresh])
+  const login = React.useCallback(
+    async (email: string, password: string) => {
+      try {
+        const u = await repoLogin(email, password)
+        refresh()
+        return u
+      } catch (err) {
+        // Local sign-in failed. If this account was created through Supabase
+        // Auth (verified email, no local record yet) we repair it online —
+        // existing local accounts keep working fully offline.
+        const healed = await healLocalAccountViaSupabase(email, password)
+        if (healed) {
+          refresh()
+          return healed
+        }
+        throw err
+      }
+    },
+    [refresh]
+  )
 
   const register = React.useCallback(
     async (input: Parameters<typeof registerUser>[0]) => {

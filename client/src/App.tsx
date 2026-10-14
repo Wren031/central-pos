@@ -4,6 +4,7 @@ import { DatabaseGate } from '@/components/common/database-gate'
 import { AppShell } from '@/components/layout/app-shell'
 import { LoginPage } from '@/features/auth/login-page'
 import { RegisterPage } from '@/features/auth/register-page'
+import { ConfirmPage } from '@/features/auth/confirm-page'
 import { OnboardingPage } from '@/features/onboarding/onboarding-page'
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { SubscriptionPage } from '@/features/subscription/subscription-page'
@@ -46,6 +47,7 @@ export default function App() {
                   </PublicOnly>
                 }
               />
+              <Route path="/auth/confirm" element={<ConfirmPage />} />
               <Route
                 path="/onboarding"
                 element={

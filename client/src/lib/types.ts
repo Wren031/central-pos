@@ -46,6 +46,22 @@ export interface Subscription {
   active: boolean
 }
 
+/**
+ * A registration whose Supabase account was created and whose details (and an
+ * already-hashed password) are staged locally while the user confirms their
+ * email via the Supabase confirmation link. Finalized on the /auth/confirm
+ * redirect — never contains a plaintext password.
+ */
+export interface PendingRegistration {
+  email: string
+  fullName: string
+  address: string
+  contactNumber: string
+  businessName: string
+  passwordHash: string
+  createdAt: string
+}
+
 export type PaymentRequestStatus = 'pending' | 'approved' | 'rejected'
 
 /**

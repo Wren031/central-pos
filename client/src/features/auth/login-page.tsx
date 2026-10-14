@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
+import { CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -53,101 +53,110 @@ export function LoginPage() {
     }
   }
 
+  const submitting = form.formState.isSubmitting
+
   return (
     <AuthLayout
-      title="Sign in to your account"
-      subtitle="Access your dashboard and POS workspace."
+      eyebrow={
+        <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+          <ShieldCheck className="size-3" aria-hidden />
+          Secure sign in
+        </span>
+      }
+      title="Welcome back"
+      subtitle="Sign in to continue to your POS workspace."
       footer={
         <>
-          Don&apos;t have an account?{' '}
+          New to Central POS?{' '}
           <Link to="/register" className="font-medium text-foreground underline underline-offset-4">
-            Register free for 30 days
+            Start your 30-day free trial
           </Link>
         </>
       }
     >
       {serverError && (
-        <Alert variant="destructive" className="mb-4">
+        <Alert variant="destructive" className="mb-4 border-destructive/30">
+          <CircleAlert aria-hidden />
           <AlertTitle>Sign in failed</AlertTitle>
           <AlertDescription>{serverError}</AlertDescription>
         </Alert>
       )}
 
       <Form {...form} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email address</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Mail
-                      className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                      aria-hidden
-                    />
-                    <Input
-                      type="email"
-                      placeholder="juan@bbqhouse.ph"
-                      autoComplete="email"
-                      autoFocus
-                      className="pl-9"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center justify-between">
-                  <FormLabel>Password</FormLabel>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                    onClick={() => toast.info('Password reset is not available in the demo build.')}
-                  >
-                    Forgot password?
-                  </button>
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email address</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    type="email"
+                    placeholder="juan@bbqhouse.ph"
+                    autoComplete="email"
+                    autoFocus
+                    className="h-11 pl-9"
+                    {...field}
+                  />
                 </div>
-                <FormControl>
-                  <div className="relative">
-                    <Lock
-                      className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                      aria-hidden
-                    />
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      className="pr-10 pl-9"
-                      {...field}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="absolute inset-y-0 right-1 my-auto"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit" size="lg" className="w-full" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting && <Loader2 className="size-4 animate-spin" />}
-            Sign in
-          </Button>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between">
+                <FormLabel>Password</FormLabel>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                  onClick={() => toast.info('Password reset is not available in the demo build.')}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <FormControl>
+                <div className="relative">
+                  <Lock
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className="h-11 pr-10 pl-9"
+                    {...field}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute inset-y-0 right-1 my-auto"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </Button>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" size="lg" className="h-11 w-full" disabled={submitting}>
+          {submitting && <Loader2 className="size-4 animate-spin" />}
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </Button>
       </Form>
     </AuthLayout>
   )

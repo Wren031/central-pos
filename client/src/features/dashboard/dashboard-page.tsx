@@ -4,7 +4,6 @@ import {
   Bell,
   CalendarClock,
   CreditCard,
-  ExternalLink,
   Grid2X2,
   Package,
   ReceiptText,
@@ -12,7 +11,7 @@ import {
   ShoppingCart,
   Store,
   TrendingUp,
-  User,
+  Trophy,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -35,41 +34,113 @@ import { StatusBadge } from '@/components/common/status-badge'
 import { formatDate, formatDateTime, peso, relativeFromNow } from '@/lib/format'
 import { getPosType } from '@/lib/pos-types'
 import { getOrders, getProducts, PLAN_LABELS } from '@/lib/repos'
+import { rangeCutoff, type DateRange } from '@/lib/date-range'
+import { productImage } from '@/lib/mock-image'
 import { mockClock } from '@/lib/mock-clock'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
+import { DateRangeSelect } from '@/features/pos/date-range-select'
 
-function QuickAction({
-  to,
-  icon: Icon,
-  label,
-  description,
-  accent,
+function TopSellers({
+  items,
+  range,
+  onRangeChange,
 }: {
-  to: string
-  icon: React.ElementType
-  label: string
-  description: string
-  accent?: string
+  items: { productId: string; name: string; emoji?: string; image?: string; qty: number; revenue: number }[]
+  range: DateRange
+  onRangeChange: (range: DateRange) => void
 }) {
+  const trackRef = React.useRef<HTMLDivElement>(null)
+  const [paused, setPaused] = React.useState(false)
+
+  // Auto-advance the carousel; pauses on hover/focus and respects reduced-motion.
+  React.useEffect(() => {
+    if (paused || items.length <= 1) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const id = window.setInterval(() => {
+      const el = trackRef.current
+      if (!el) return
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (maxScroll <= 4) return
+      if (el.scrollLeft >= maxScroll - 4) {
+        el.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        el.scrollBy({ left: Math.max(el.clientWidth * 0.7, 160), behavior: 'smooth' })
+      }
+    }, 3500)
+    return () => window.clearInterval(id)
+  }, [paused, items.length])
+
   return (
-    <Link
-      to={to}
-      className="group flex items-center gap-3 rounded-xl border bg-background p-4 transition-all hover:border-foreground/20 hover:shadow-sm"
-    >
-      <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105"
-        style={accent ? { backgroundColor: `${accent}1a`, color: accent } : { backgroundColor: 'var(--muted)' }}
-      >
-        <Icon className="size-5" aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{label}</span>
-        <span className="block truncate text-xs text-muted-foreground">{description}</span>
-      </span>
-      <ExternalLink className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
-    </Link>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <Trophy className="size-4" aria-hidden />
+          Top selling products
+        </h3>
+        <DateRangeSelect value={range} onChange={onRangeChange} className="w-40" />
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon={Trophy}
+          title="No sales in this period"
+          description="Ring up a sale in the POS workspace to see your best sellers here."
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link to="/pos/catalog">Go to catalog</Link>
+            </Button>
+          }
+          className="border-0"
+        />
+      ) : (
+        <div
+          ref={trackRef}
+          role="list"
+          aria-label="Top selling products"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocusCapture={() => setPaused(true)}
+          onBlurCapture={() => setPaused(false)}
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {items.map((p, i) => (
+            <div
+              key={p.productId}
+              role="listitem"
+              className="w-40 shrink-0 snap-start overflow-hidden rounded-xl border bg-card"
+            >
+              <div className="relative aspect-[4/3] overflow-hidden bg-muted/40">
+                <img
+                  src={p.image || productImage(p.name, p.emoji ?? '🛒')}
+                  alt=""
+                  className="size-full object-cover"
+                  loading="lazy"
+                />
+                <span
+                  className={cn(
+                    'absolute top-2 left-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold shadow-sm',
+                    i === 0 ? 'bg-amber-400 text-amber-950' : 'bg-background/90 text-foreground'
+                  )}
+                >
+                  #{i + 1}
+                </span>
+              </div>
+              <div className="space-y-1 p-3">
+                <p className="line-clamp-1 text-sm font-medium" title={p.name}>
+                  {p.name}
+                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">{p.qty} sold</span>
+                  <span className="text-sm font-semibold tabular-nums">{peso(p.revenue)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -78,6 +149,10 @@ export function DashboardPage() {
   const { sub, state, notifications, transactions } = useSubscription()
   const navigate = useNavigate()
   const [todaySales, setTodaySales] = React.useState<{ total: number; orders: number; lowStock: number } | null>(null)
+  const [topRange, setTopRange] = React.useState<DateRange>('30')
+  const [topProducts, setTopProducts] = React.useState<
+    { productId: string; name: string; emoji?: string; image?: string; qty: number; revenue: number }[]
+  >([])
 
   React.useEffect(() => {
     if (!store) return
@@ -97,7 +172,37 @@ export function DashboardPage() {
       orders: today.length,
       lowStock: products.filter((p) => p.stock <= 10).length,
     })
-  }, [store, transactions.length])
+
+    // Top selling products over the selected range — paid orders only, the same
+    // basis used by the Reports module. Recomputed after each sale via the
+    // transactions dependency.
+    const byId = new Map(products.map((p) => [p.id, p]))
+    const cutoff = rangeCutoff(topRange, now)
+    const map = new Map<
+      string,
+      { productId: string; name: string; emoji?: string; image?: string; qty: number; revenue: number }
+    >()
+    for (const o of orders) {
+      if (o.paymentStatus !== 'paid') continue
+      if (new Date(o.createdAt).getTime() < cutoff) continue
+      for (const it of o.items) {
+        const entry = map.get(it.productId) ?? {
+          productId: it.productId,
+          name: byId.get(it.productId)?.name ?? it.name,
+          emoji: byId.get(it.productId)?.emoji,
+          image: byId.get(it.productId)?.image,
+          qty: 0,
+          revenue: 0,
+        }
+        entry.qty += it.qty
+        entry.revenue += it.price * it.qty
+        map.set(it.productId, entry)
+      }
+    }
+    setTopProducts(
+      [...map.values()].sort((a, b) => b.qty - a.qty || b.revenue - a.revenue).slice(0, 5)
+    )
+  }, [store, transactions.length, topRange])
 
   if (!ready || !user) {
     return (
@@ -207,18 +312,7 @@ export function DashboardPage() {
                 <Link to="/subscription">Manage plan</Link>
               </Button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <QuickAction
-                to="/pos"
-                icon={ShoppingCart}
-                label="Open POS"
-                description="Start selling from the workspace"
-                accent={posDef?.theme.accent}
-              />
-              <QuickAction to="/onboarding" icon={Grid2X2} label="Change POS type" description="Switch to another industry POS" />
-              <QuickAction to="/subscription" icon={CreditCard} label="Manage subscription" description="Plans, renewals & billing history" />
-              <QuickAction to="/profile" icon={User} label="Edit profile" description="Personal info, store & preferences" />
-            </div>
+            <TopSellers items={topProducts} range={topRange} onRangeChange={setTopRange} />
           </CardContent>
         </Card>
 
