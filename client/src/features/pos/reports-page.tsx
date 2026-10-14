@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarRange, TrendingUp, Wallet } from 'lucide-react'
+import { CalendarRange, Download, Loader2, TrendingUp, Wallet } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +26,11 @@ import { mockClock } from '@/lib/mock-clock'
 import { peso } from '@/lib/format'
 import { getOrders, getProducts } from '@/lib/repos'
 import { useAuth } from '@/state/auth-context'
+import {
+  buildSalesReportCsv,
+  downloadSalesReport,
+  type SalesReportData,
+} from '@/services/report-export-service'
 import { DateRangeSelect } from './date-range-select'
 
 /** Hour-of-day label like "3 PM" for the Today view's best-hour stat. */
@@ -36,17 +42,8 @@ export function ReportsPage() {
   const { store } = useAuth()
   const [range, setRange] = React.useState<DateRange>(DATE_RANGE_DEFAULT)
   const [loading, setLoading] = React.useState(true)
-  const [data, setData] = React.useState<{
-    paidTotal: number
-    unpaidTotal: number
-    orderCount: number
-    paidCount: number
-    avgTicket: number
-    byCategory: { name: string; revenue: number; qty: number }[]
-    byDay: { label: string; revenue: number }[]
-    topItems: { name: string; qty: number; revenue: number }[]
-    bestDay: { label: string; revenue: number } | null
-  } | null>(null)
+  const [exporting, setExporting] = React.useState(false)
+  const [data, setData] = React.useState<SalesReportData | null>(null)
 
   React.useEffect(() => {
     if (!store) return
@@ -137,6 +134,20 @@ export function ReportsPage() {
     )
   }
 
+  function handleExport() {
+    if (!data || !store) return
+    setExporting(true)
+    try {
+      const csv = buildSalesReportCsv(data, range, store)
+      downloadSalesReport(csv, range)
+      toast.success('Report exported')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const maxCat = data && data.byCategory.length ? data.byCategory[0].revenue || 1 : 1
 
   return (
@@ -148,7 +159,17 @@ export function ReportsPage() {
             Performance insights from paid orders · {DATE_RANGE_LABEL[range]}
           </p>
         </div>
-        <DateRangeSelect value={range} onChange={setRange} className="sm:w-44" />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <DateRangeSelect value={range} onChange={setRange} className="sm:w-44" />
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={loading || !data || exporting}
+          >
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Export
+          </Button>
+        </div>
       </div>
 
       {loading || !data ? (
