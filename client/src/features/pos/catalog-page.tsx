@@ -23,7 +23,7 @@ import { EmptyState } from '@/components/common/empty-state'
 import { formatDateTime, peso } from '@/lib/format'
 import { productImage } from '@/lib/mock-image'
 import { getPosType } from '@/lib/pos-types'
-import { getOrders, getProducts } from '@/lib/repos'
+import { getCategories, getOrders, getProducts } from '@/lib/repos'
 import { cn } from '@/lib/utils'
 import type { Order, Product } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
@@ -160,10 +160,8 @@ export function CatalogPage() {
   }, [refreshProducts])
 
   const posDef = store ? getPosType(store.posType) : null
-  const categories = React.useMemo(() => {
-    if (!posDef) return ['All']
-    return ['All', ...posDef.categories]
-  }, [posDef])
+  // Categories come from the store's (Supabase-derived) category config.
+  const categories = store ? ['All', ...getCategories(store.id).map((c) => c.name)] : ['All']
 
   const filtered = React.useMemo(() => {
     if (!products) return []

@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, CreditCard, Sparkles, Store } from 'lucide-react'
 import { Brand } from '@/components/common/brand'
-import { POS_TYPES } from '@/lib/pos-types'
+import { getPosTypes } from '@/lib/pos-types'
+import { refreshPosCatalog } from '@/services/pos-catalog-service'
 
 const FEATURES = [
   {
@@ -23,7 +24,6 @@ const FEATURES = [
 ]
 
 const STATS = [
-  { value: '7', label: 'POS types' },
   { value: '30', label: 'days free' },
   { value: '₱0', label: 'to start' },
 ]
@@ -41,6 +41,15 @@ export function AuthLayout({
   children: ReactNode
   footer?: ReactNode
 }) {
+  const [posTypes, setPosTypes] = useState(() => getPosTypes())
+
+  useEffect(() => {
+    const sync = () => setPosTypes(getPosTypes())
+    void refreshPosCatalog().then(sync)
+    window.addEventListener('cpos:data-changed', sync)
+    return () => window.removeEventListener('cpos:data-changed', sync)
+  }, [])
+
   return (
     <div className="grid min-h-svh w-full lg:h-svh lg:overflow-hidden lg:grid-cols-[1.15fr_minmax(0,30rem)] xl:grid-cols-[1.25fr_minmax(0,34rem)]">
       {/* Brand / marketing panel (desktop) */}
@@ -109,6 +118,12 @@ export function AuthLayout({
 
         <div className="relative space-y-5">
           <div className="flex items-center gap-6">
+            {posTypes.length > 0 && (
+              <div>
+                <div className="text-xl font-semibold tracking-tight">{posTypes.length}</div>
+                <div className="text-[11px] text-white/55">POS types</div>
+              </div>
+            )}
             {STATS.map((s) => (
               <div key={s.label}>
                 <div className="text-xl font-semibold tracking-tight">{s.value}</div>
@@ -117,7 +132,7 @@ export function AuthLayout({
             ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {POS_TYPES.map((t) => (
+            {posTypes.map((t) => (
               <span
                 key={t.id}
                 className="rounded-full border border-white/12 bg-white/5 px-2.5 py-1 text-[11px] text-white/65"

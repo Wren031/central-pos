@@ -1,13 +1,14 @@
 import * as React from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Check, Loader2, Sparkles } from 'lucide-react'
+import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { POS_TYPES, getPosType } from '@/lib/pos-types'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getPosType, getPosTypes, isPosCatalogEmpty } from '@/lib/pos-types'
+import { refreshPosCatalog, getPosCatalogError } from '@/services/pos-catalog-service'
 import { setupStore } from '@/lib/repos'
-import type { PosTypeId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
 import { Brand } from '@/components/common/brand'
@@ -20,7 +21,7 @@ const SETUP_STEPS = [
   'Almost ready…',
 ]
 
-function PosPreview({ posType }: { posType: PosTypeId }) {
+function PosPreview({ posType }: { posType: string }) {
   const def = getPosType(posType)
   const t = def.theme
   return (
@@ -69,9 +70,34 @@ function PosPreview({ posType }: { posType: PosTypeId }) {
 export function OnboardingPage() {
   const { user, store, refresh, setStoreLocal } = useAuth()
   const navigate = useNavigate()
-  const [selected, setSelected] = React.useState<PosTypeId | null>(store?.posType ?? null)
+  const [selected, setSelected] = React.useState<string | null>(store?.posType ?? null)
   const [generating, setGenerating] = React.useState(false)
   const [step, setStep] = React.useState(0)
+  const [types, setTypes] = React.useState(() => getPosTypes())
+  const [loading, setLoading] = React.useState(() => isPosCatalogEmpty())
+  const [error, setError] = React.useState<string | null>(null)
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    const ok = await refreshPosCatalog()
+    if (!ok && isPosCatalogEmpty()) {
+      setError(
+        getPosCatalogError() ??
+          'Could not load POS types. Check your connection and try again.'
+      )
+    } else {
+      setError(null)
+    }
+    setTypes(getPosTypes())
+    setLoading(false)
+  }, [])
+
+  React.useEffect(() => {
+    const sync = () => setTypes(getPosTypes())
+    void load()
+    window.addEventListener('cpos:data-changed', sync)
+    return () => window.removeEventListener('cpos:data-changed', sync)
+  }, [load])
 
   if (!user) return <Navigate to="/login" replace />
 
@@ -80,6 +106,19 @@ export function OnboardingPage() {
 
   async function handleGenerate() {
     if (!selected || !user) return
+    // Validate the selection is still an active, available POS type before
+    // creating the store (the admin may have deactivated it since it loaded).
+    let available = getPosTypes()
+    if (!available.some((t) => t.id === selected)) {
+      await refreshPosCatalog()
+      available = getPosTypes()
+    }
+    if (!available.some((t) => t.id === selected)) {
+      setTypes(available)
+      toast.error('That POS type is no longer available. Please pick another.')
+      return
+    }
+
     setGenerating(true)
     setStep(0)
     const timer = setInterval(() => {
@@ -165,63 +204,103 @@ export function OnboardingPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {POS_TYPES.map((type) => {
-            const isSelected = selected === type.id
-            return (
-              <Card
-                key={type.id}
-                role="radio"
-                aria-checked={isSelected}
-                tabIndex={0}
-                onClick={() => setSelected(type.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setSelected(type.id)
-                  }
-                }}
-                className={cn(
-                  'relative cursor-pointer gap-3 p-4 shadow-none transition-all hover:border-foreground/25 hover:shadow-sm',
-                  isSelected && 'border-2 shadow-md ring-1 ring-foreground/10'
-                )}
-                style={isSelected ? { borderColor: type.theme.accent } : undefined}
-              >
-                {isSelected && (
-                  <span
-                    className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full text-white"
-                    style={{ backgroundColor: type.theme.accent }}
-                    aria-hidden
-                  >
-                    <Check className="size-3" />
-                  </span>
-                )}
-                <div className="flex items-center gap-3">
-                  <span
-                    className="flex size-10 shrink-0 items-center justify-center rounded-lg text-white"
-                    style={{ backgroundColor: type.theme.accent }}
-                  >
-                    <type.icon className="size-5" aria-hidden />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold">{type.name}</p>
-                    <p className="text-xs text-muted-foreground">{type.tagline}</p>
+        {error ? (
+          <Card className="mx-auto max-w-md gap-3 p-6 text-center shadow-none">
+            <div className="flex flex-col items-center gap-3">
+              <span className="flex size-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                <RefreshCw className="size-6" aria-hidden />
+              </span>
+              <div>
+                <p className="font-medium">Couldn’t load POS types</p>
+                <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+              </div>
+              <Button onClick={() => void load()} disabled={loading}>
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                Retry
+              </Button>
+            </div>
+          </Card>
+        ) : loading && types.length === 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <Skeleton key={i} className="h-64" />
+            ))}
+          </div>
+        ) : types.length === 0 ? (
+          <div className="rounded-xl border bg-muted/30 py-16 text-center">
+            <p className="font-medium">No POS types available</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              An administrator hasn’t published any POS types yet. Please check back later.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {types.map((type) => {
+              const isSelected = selected === type.id
+              return (
+                <Card
+                  key={type.id}
+                  role="radio"
+                  aria-checked={isSelected}
+                  tabIndex={0}
+                  onClick={() => setSelected(type.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelected(type.id)
+                    }
+                  }}
+                  className={cn(
+                    'relative cursor-pointer gap-3 p-4 shadow-none transition-all hover:border-foreground/25 hover:shadow-sm',
+                    isSelected && 'border-2 shadow-md ring-1 ring-foreground/10'
+                  )}
+                  style={isSelected ? { borderColor: type.theme.accent } : undefined}
+                >
+                  {isSelected && (
+                    <span
+                      className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full text-white"
+                      style={{ backgroundColor: type.theme.accent }}
+                      aria-hidden
+                    >
+                      <Check className="size-3" />
+                    </span>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex size-10 shrink-0 items-center justify-center rounded-lg text-white"
+                      style={{ backgroundColor: type.theme.accent }}
+                    >
+                      <type.icon className="size-5" aria-hidden />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">{type.name}</p>
+                      <p className="text-xs text-muted-foreground">{type.tagline}</p>
+                    </div>
                   </div>
-                </div>
-                <PosPreview posType={type.id} />
-                <p className="text-xs leading-relaxed text-muted-foreground">{type.description}</p>
-                <ul className="space-y-1">
-                  {type.features.map((f) => (
-                    <li key={f} className="flex items-start gap-1.5 text-xs">
-                      <Check className="mt-0.5 size-3 shrink-0" style={{ color: type.theme.accent }} aria-hidden />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            )
-          })}
-        </div>
+                  <PosPreview posType={type.id} />
+                  <p className="text-xs leading-relaxed text-muted-foreground">{type.description}</p>
+                  {type.categories.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {type.categories.slice(0, 5).map((c) => (
+                        <span
+                          key={c}
+                          className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                      {type.categories.length > 5 && (
+                        <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                          +{type.categories.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        )}
 
         <div className="sticky bottom-16 z-10 mt-8 flex flex-col items-center gap-3 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur md:bottom-4 sm:flex-row sm:justify-between">
           <p className="text-sm text-muted-foreground">

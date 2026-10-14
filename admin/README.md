@@ -62,6 +62,10 @@ order**:
    `pos_type_categories` assignments
 6. `supabase/06_releases.sql` — `pos_releases` (installer releases), anon
    read policies for landing data, and the public `pos-releases` storage bucket
+7. `supabase/07_payment_requests.sql`, `supabase/08_email_verification.sql` —
+   GCash payment requests and email-verification support
+8. `supabase/09_pos_type_public_read.sql` — lets the session-less POS client
+   read active POS types + their categories (writes stay admin-only)
 
 The scripts are idempotent — safe to re-run after a partial failure.
 

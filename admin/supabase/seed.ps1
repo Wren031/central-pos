@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$files = @('01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql', '07_payment_requests.sql', '08_email_verification.sql')
+$files = @('01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql', '07_payment_requests.sql', '08_email_verification.sql', '09_pos_type_public_read.sql')
 
 if (-not $Token -and -not $DbPassword) {
   Write-Error 'Provide -Token <supabase-access-token> OR -DbPassword <database-password>. See .SYNOPSIS above.'

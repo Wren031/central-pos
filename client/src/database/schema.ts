@@ -9,6 +9,8 @@ import type {
   PendingRegistration,
   PosConfigRecord,
   PosTypeId,
+  PosTypeRecord,
+  PosCategoryRecord,
   PrinterSettings,
   Product,
   SessionRow,
@@ -26,6 +28,8 @@ export class CposDatabase extends Dexie {
   sessions!: EntityTable<SessionRow, 'id'>
   stores!: EntityTable<Store, 'id'>
   posConfigs!: EntityTable<PosConfigRecord, 'id'>
+  posCatalog!: EntityTable<PosTypeRecord, 'id'>
+  posCatalogCategories!: EntityTable<PosCategoryRecord, 'id'>
   categories!: EntityTable<Category, 'id'>
   products!: EntityTable<Product, 'id'>
   stockMovements!: EntityTable<StockMovement, 'id'>
@@ -66,6 +70,10 @@ export class CposDatabase extends Dexie {
     })
     this.version(3).stores({
       pendingRegistrations: 'email',
+    })
+    this.version(4).stores({
+      posCatalog: 'id, active, sortOrder',
+      posCatalogCategories: 'id, posTypeId, categoryId',
     })
   }
 }

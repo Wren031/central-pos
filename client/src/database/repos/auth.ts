@@ -5,6 +5,7 @@ import { hashPassword, isPbkdf2Hash, legacyEncode, verifyPassword } from '../aut
 import { PLAN_PRICES, PLAN_DAYS } from '@/lib/plan-constants'
 import { mockClock } from '@/lib/mock-clock'
 import { latency, newId, nowIso, syncOpFor, putSyncOp } from './helpers'
+import { getPosTypeCategories } from './pos-catalog'
 import type { NotificationPrefs, PendingRegistration, PosTypeId, Store, Subscription, User } from '@/lib/types'
 
 /* ---------- users & session ---------- */
@@ -321,15 +322,26 @@ export async function setupStore(userId: string, posType: PosTypeId): Promise<St
   const oldProducts = existing
     ? await db.products.where('storeId').equals(existing.id).toArray()
     : []
+  // Categories come from the POS type's Supabase assignment (pos_type_categories).
+  const assignedCategories = getPosTypeCategories(posType).map((c) => ({
+    id: c.categoryId,
+    storeId: store.id,
+    name: c.name,
+    createdAt: now,
+  }))
   await db.transaction(
     'rw',
     [db.stores, db.products, db.categories, db.stockMovements, db.syncQueue],
     async () => {
       await db.stores.put(store)
+      // Load the POS type's category configuration into the workspace.
+      await db.categories.where('storeId').equals(store.id).delete()
+      if (assignedCategories.length > 0) {
+        await db.categories.bulkPut(assignedCategories)
+      }
       if (existing) {
         // POS layout changed — clear the old catalog so items match the new type.
         await db.products.bulkDelete(oldProducts.map((p) => p.id))
-        await db.categories.where('storeId').equals(store.id).delete()
         await db.stockMovements.where('storeId').equals(store.id).delete()
       }
       await putSyncOp(syncOpFor('store', store.id, existing ? 'update' : 'create', store.id, { posType }))

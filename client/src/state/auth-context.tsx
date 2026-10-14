@@ -9,6 +9,8 @@ import {
   syncSubscriptionNotifications,
 } from '@/lib/repos'
 import { healLocalAccountViaSupabase } from '@/services/supabase-account'
+import { refreshPosCatalog } from '@/services/pos-catalog-service'
+import { subscribeOnline } from '@/offline/connectivity'
 import type { Store, User } from '@/lib/types'
 
 interface AuthValue {
@@ -49,8 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const offDb = subscribeDb(refresh)
     const onClock = () => refresh()
     window.addEventListener('cpos:clock-changed', onClock)
+    // Keep the admin-managed POS-type catalog fresh: fetch on startup and
+    // whenever the device comes back online. Never touches business data.
+    void refreshPosCatalog()
+    const offOnline = subscribeOnline(() => void refreshPosCatalog())
     return () => {
       offDb()
+      offOnline()
       window.removeEventListener('cpos:clock-changed', onClock)
     }
   }, [refresh])

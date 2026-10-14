@@ -63,8 +63,7 @@ import {
 import { EmptyState } from '@/components/common/empty-state'
 import { peso } from '@/lib/format'
 import { fileToProductImage, productImage } from '@/lib/mock-image'
-import { getPosType } from '@/lib/pos-types'
-import { addProduct, deleteProduct, getProducts, updateProduct } from '@/lib/repos'
+import { getCategories, addProduct, deleteProduct, getProducts, updateProduct } from '@/lib/repos'
 import type { Product } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
@@ -414,7 +413,6 @@ export function InventoryPage() {
     )
   }
 
-  const posDef = getPosType(store.posType)
   const filtered = (products ?? []).filter((p) => {
     const q = query.trim().toLowerCase()
     if (!q) return true
@@ -576,7 +574,7 @@ export function InventoryPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         product={editing}
-        categories={posDef.categories}
+        categories={getCategories(store.id).map((c) => c.name)}
         storeId={store.id}
         onSaved={refresh}
       />

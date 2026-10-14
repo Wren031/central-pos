@@ -1,6 +1,6 @@
 import { db } from './schema'
 import { migrateLegacyIfNeeded } from './migrate-legacy'
-import { seedPosConfigs } from './seed'
+import { hydratePosCatalog } from './repos/pos-catalog'
 import { replaceCache, resetCache, type CacheState } from './cache'
 import type {
   AppNotification,
@@ -84,7 +84,7 @@ export function initDatabase(): Promise<DbInitResult> {
     try {
       await db.open()
       const migrated = await migrateLegacyIfNeeded()
-      await seedPosConfigs()
+      await hydratePosCatalog()
       await hydrate()
       initialized = true
       return { ok: true, migrated }

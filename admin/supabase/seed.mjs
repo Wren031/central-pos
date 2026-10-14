@@ -14,7 +14,7 @@ if (!token) {
 }
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const files = ['01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql', '07_payment_requests.sql', '08_email_verification.sql'];
+const files = ['01_schema.sql', '02_rls.sql', '03_functions.sql', '04_seed.sql', '05_categories_migration.sql', '06_releases.sql', '07_payment_requests.sql', '08_email_verification.sql', '09_pos_type_public_read.sql'];
 
 for (const f of files) {
   const sql = readFileSync(join(dir, f), 'utf8');

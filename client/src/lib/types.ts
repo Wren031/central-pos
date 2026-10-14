@@ -1,11 +1,8 @@
-export type PosTypeId =
-  | 'bbq'
-  | 'retail'
-  | 'grocery'
-  | 'restaurant'
-  | 'cafe'
-  | 'pharmacy'
-  | 'general'
+/**
+ * POS type id — the Supabase `pos_types.id` text key (managed in the admin
+ * dashboard). Not a fixed enum: admins can create new types at any time.
+ */
+export type PosTypeId = string
 
 export type PlanId = 'trial' | 'weekly' | 'monthly' | 'yearly'
 
@@ -254,6 +251,38 @@ export interface PosConfigRecord {
   categories: string[]
   seedProducts: { name: string; category: string; price: number; emoji: string; stock: number }[]
   updatedAt: string
+}
+
+/**
+ * A POS type cached from Supabase (`pos_types`). Admin-managed; the POS client
+ * only ever reads active rows. `icon` is a lucide icon name (see
+ * lib/pos-presentation.ts) and the theme is derived client-side.
+ */
+export interface PosTypeRecord {
+  id: string
+  name: string
+  tagline: string
+  description: string
+  icon: string | null
+  category: string | null
+  active: boolean
+  sortOrder: number
+  fetchedAt: string
+}
+
+/**
+ * A category assigned to a POS type (Supabase `pos_type_categories` joined with
+ * `categories`). `categoryId` is the global Supabase category uuid and is also
+ * used as the local store category id.
+ */
+export interface PosCategoryRecord {
+  /** Composite cache key: `${posTypeId}:${categoryId}`. */
+  id: string
+  posTypeId: string
+  categoryId: string
+  name: string
+  slug: string
+  sortOrder: number
 }
 
 export interface SyncMetaRow {
