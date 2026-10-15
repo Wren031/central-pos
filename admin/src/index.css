@@ -100,6 +100,20 @@
   --sidebar-ring: oklch(0.585 0.233 277);
 }
 
+/*
+ * Landing page surface.
+ *
+ * The public marketing page sits on a soft, slightly cool grey rather than the
+ * near-white used by the admin console, so white cards and the 3D hardware
+ * separate cleanly from the page. Scoped to this class so the dashboard keeps
+ * its own tokens untouched — every `bg-background` / `hover:bg-muted` inside
+ * the landing tree picks these up automatically.
+ */
+.landing-surface {
+  --background: oklch(0.966 0.005 264);
+  --muted: oklch(0.941 0.008 264);
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
