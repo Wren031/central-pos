@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/state/auth-context'
+import { AccountSuspendedError } from '@/lib/account-status'
 import { AuthLayout } from './auth-layout'
 
 const schema = z.object({
@@ -32,28 +33,35 @@ export function LoginPage() {
   const location = useLocation()
   const [showPassword, setShowPassword] = React.useState(false)
   const [serverError, setServerError] = React.useState<string | null>(null)
+  const [suspended, setSuspended] = React.useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   })
 
-  if (user) return <Navigate to="/" replace />
+  const submitting = form.formState.isSubmitting
+
+  // Only auto-redirect an already-signed-in visitor. While a sign-in is in
+  // flight we must NOT navigate yet: the local session is created before the
+  // account-status check completes, so redirecting early would flash the
+  // workspace (and swallow the suspension message) for a suspended account.
+  if (user && !submitting) return <Navigate to="/" replace />
 
   const from = (location.state as { from?: string } | null)?.from ?? '/'
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
+    setSuspended(false)
     try {
       const u = await login(values.email, values.password)
       toast.success(`Welcome back, ${u.fullName.split(' ')[0]}!`)
       navigate(from, { replace: true })
     } catch (err) {
+      setSuspended(err instanceof AccountSuspendedError)
       setServerError(err instanceof Error ? err.message : 'Login failed.')
     }
   }
-
-  const submitting = form.formState.isSubmitting
 
   return (
     <AuthLayout
@@ -77,7 +85,7 @@ export function LoginPage() {
       {serverError && (
         <Alert variant="destructive" className="mb-4 border-destructive/30">
           <CircleAlert aria-hidden />
-          <AlertTitle>Sign in failed</AlertTitle>
+          <AlertTitle>{suspended ? 'Account suspended' : 'Sign in failed'}</AlertTitle>
           <AlertDescription>{serverError}</AlertDescription>
         </Alert>
       )}

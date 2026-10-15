@@ -1,10 +1,14 @@
 import { db } from '../schema'
 import { refreshCacheForUser } from '../db'
-import { getCache, resetCache } from '../cache'
+import { getCache, patchCache, resetCache } from '../cache'
 import { hashPassword, isPbkdf2Hash, legacyEncode, verifyPassword } from '../auth-hash'
 import { mockClock } from '@/lib/mock-clock'
 import { latency, newId, nowIso, syncOpFor, putSyncOp } from './helpers'
 import { getPosTypeCategories } from './pos-catalog'
+import { isOnline } from '@/offline/connectivity'
+import { supabase, supabaseConfigured } from '@/lib/supabase'
+import { clearSuspendedMarker } from '@/lib/account-status'
+import { markAccountDeleted } from '@/lib/deleted-accounts'
 import type { NotificationPrefs, PendingRegistration, PosTypeId, Store, Subscription, User } from '@/lib/types'
 
 /* ---------- users & session ---------- */
@@ -210,6 +214,27 @@ export async function isEmailRegistered(email: string): Promise<boolean> {
   return Boolean(found)
 }
 
+/**
+ * Persist the authoritative account status verified against Supabase
+ * (`profiles.status`). Caching it on the local user record is what lets a
+ * suspension survive a page refresh, an app restart, and going offline — so a
+ * suspended account cannot regain access by disconnecting.
+ */
+export async function markUserAccountStatus(
+  userId: string,
+  status: 'active' | 'suspended',
+  checkedAt: string
+): Promise<void> {
+  const user = await db.users.get(userId)
+  if (!user) return
+  await db.users.update(userId, { accountStatus: status, accountStatusCheckedAt: checkedAt })
+  patchCache({
+    users: getCache().users.map((u) =>
+      u.id === userId ? { ...u, accountStatus: status, accountStatusCheckedAt: checkedAt } : u
+    ),
+  })
+}
+
 export async function updateProfile(
   userId: string,
   patch: Partial<Pick<User, 'fullName' | 'address' | 'contactNumber' | 'businessName' | 'notificationPrefs'>>
@@ -246,8 +271,76 @@ export async function changePassword(userId: string, current: string, next: stri
   await refreshCacheForUser(userId)
 }
 
-export async function deleteAccount(userId: string): Promise<void> {
+/* ---------- account deletion ---------- */
+
+/**
+ * Permanently delete the account's Supabase Auth user (and, via FK cascade, its
+ * profile/store/subscription rows). Ownership is proven by re-authenticating
+ * with the password, which yields a genuine short-lived session so the
+ * `delete_my_account()` RPC can run with `auth.uid()`.
+ *
+ * Throws on any real failure so the caller does NOT wipe local data (which would
+ * leave the cloud account alive and the heal path able to resurrect it). A
+ * purely local account (never registered in Supabase Auth) is not an error —
+ * there is simply nothing to delete remotely.
+ */
+async function deleteRemoteAccount(email: string, password: string): Promise<void> {
+  if (!supabaseConfigured) return
+
+  const normalized = email.trim().toLowerCase()
+
+  let signIn
+  try {
+    signIn = await supabase.auth.signInWithPassword({ email: normalized, password })
+  } catch {
+    throw new Error('Could not reach the server to delete your account. Check your connection and try again.')
+  }
+
+  if (signIn.error) {
+    const code = (signIn.error.code ?? '').toLowerCase()
+    const message = (signIn.error.message ?? '').toLowerCase()
+    const invalidCredentials =
+      code === 'invalid_credentials' ||
+      message.includes('invalid login credentials') ||
+      message.includes('invalid credentials')
+    // No matching cloud user → purely local account; nothing to delete remotely.
+    if (invalidCredentials) return
+    // Network/config/other: refuse so the cloud account is never orphaned.
+    throw new Error('Could not verify your account with the server. Check your connection and try again.')
+  }
+
+  try {
+    const { error } = await supabase.rpc('delete_my_account')
+    if (error) {
+      throw new Error(
+        error.message?.trim() ||
+          'The server could not delete your account. Please try again or contact support.'
+      )
+    }
+  } finally {
+    await supabase.auth.signOut().catch(() => {})
+  }
+}
+
+export async function deleteAccount(userId: string, password: string): Promise<void> {
   await latency()
+  const user = await db.users.get(userId)
+  if (!user) throw new Error('Account not found.')
+  if (user.id !== userId) throw new Error('Account not found.')
+
+  // Prove ownership locally before doing anything irreversible.
+  const ok = await verifyPassword(password, user.passwordHash)
+  if (!ok) throw new Error('Incorrect password.')
+
+  // Deletion must be verified against Supabase so the cloud account is really
+  // gone — otherwise the client's "heal" fallback can silently re-create it.
+  // We block while offline rather than half-delete and risk resurrection.
+  if (!isOnline()) {
+    throw new Error("You're offline. Connect to the internet to delete your account.")
+  }
+
+  await deleteRemoteAccount(user.email, password)
+
   const stores = await db.stores.where('userId').equals(userId).toArray()
   const storeIds = stores.map((s) => s.id)
   await db.transaction(
@@ -266,6 +359,7 @@ export async function deleteAccount(userId: string): Promise<void> {
       db.categories,
       db.stockMovements,
       db.syncQueue,
+      db.pendingRegistrations,
     ],
     async () => {
       await db.users.delete(userId)
@@ -281,10 +375,17 @@ export async function deleteAccount(userId: string): Promise<void> {
       }
       await db.transactions.where('userId').equals(userId).delete()
       await db.notifications.where('userId').equals(userId).delete()
+      await db.pendingRegistrations.delete(user.email.trim().toLowerCase())
       await db.sessions.delete('current')
-      await putSyncOp(syncOpFor('user', userId, 'delete'))
+      // Drop any queued sync ops for this account so it is not pushed back.
+      await db.syncQueue.where('entityId').equals(userId).delete()
     }
   )
+
+  // Record a local tombstone and clear the suspension block so the heal path can
+  // never restore this account on this device.
+  markAccountDeleted(user.email)
+  clearSuspendedMarker()
   resetCache()
 }
 

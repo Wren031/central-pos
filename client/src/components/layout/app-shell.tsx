@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   Bell,
   ChartNoAxesColumnIncreasing,
   ChevronRight,
@@ -306,7 +307,7 @@ function MobileBottomNav() {
 }
 
 export function AppShell() {
-  const { user, store } = useAuth()
+  const { user, store, accountStatus } = useAuth()
   const { state } = useSubscription()
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const location = useLocation()
@@ -364,6 +365,15 @@ export function AppShell() {
               </div>
             </div>
             <StatusBadge status={state.status} className="hidden sm:inline-flex" />
+            {accountStatus === 'unverified' && (
+              <span
+                className="hidden items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 sm:inline-flex"
+                title="Your account status could not be verified yet. Showing cached access until it can be confirmed."
+              >
+                <AlertTriangle className="size-3" aria-hidden />
+                Unverified
+              </span>
+            )}
             <SyncStatusPill />
             <NotificationBell />
             <div className="hidden lg:block">

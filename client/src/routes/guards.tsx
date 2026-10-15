@@ -2,9 +2,10 @@ import * as React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { useAuth } from '@/state/auth-context'
+import { SuspendedScreen } from '@/features/auth/suspended-screen'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, store, ready } = useAuth()
+  const { user, store, ready, accountStatus } = useAuth()
   const location = useLocation()
 
   if (!ready) {
@@ -14,6 +15,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <span className="sr-only">Loading…</span>
       </div>
     )
+  }
+
+  // A suspended account is blocked from EVERY protected route — including on a
+  // refresh, an app restart, or a direct URL. Checked before the redirect so a
+  // suspended user is never bounced to login and cannot slip through.
+  if (accountStatus === 'suspended') {
+    return <SuspendedScreen />
   }
 
   if (!user) {

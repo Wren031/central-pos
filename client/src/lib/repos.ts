@@ -12,6 +12,7 @@ export {
   getSession,
   getCurrentUser,
   isEmailRegistered,
+  markUserAccountStatus,
   stagePendingRegistration,
   getPendingRegistration,
   clearPendingRegistration,

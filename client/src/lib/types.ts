@@ -28,6 +28,13 @@ export interface User {
   passwordHash: string
   notificationPrefs: NotificationPrefs
   createdAt: string
+  /**
+   * Last account status verified against Supabase (`profiles.status`). Cached so
+   * a suspension survives refresh/offline. Absent = never verified.
+   */
+  accountStatus?: 'active' | 'suspended'
+  /** ISO timestamp of the last successful server status check. */
+  accountStatusCheckedAt?: string
 }
 
 export interface Store {

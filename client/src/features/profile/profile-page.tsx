@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   AlertTriangle,
+  CircleAlert,
   CreditCard,
   Eye,
   EyeOff,
@@ -83,6 +84,9 @@ export function ProfilePage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteConfirm, setDeleteConfirm] = React.useState('')
+  const [deletePassword, setDeletePassword] = React.useState('')
+  const [deleteError, setDeleteError] = React.useState<string | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
   const [prefs, setPrefs] = React.useState(user?.notificationPrefs ?? {
     expiration: true,
     reminders: true,
@@ -127,9 +131,24 @@ export function ProfilePage() {
   }
 
   async function handleDelete() {
-    await deleteAccount(user!.id)
-    toast.success('Account deleted')
-    navigate('/register', { replace: true })
+    setDeleteError(null)
+    if (!deletePassword) {
+      setDeleteError('Enter your password to confirm.')
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteAccount(user!.id, deletePassword)
+      toast.success('Your account has been permanently deleted.')
+      setDeleteOpen(false)
+      // The local session was cleared; go to sign-in (not register — the user
+      // deleted on purpose; they can sign up again explicitly if they wish).
+      navigate('/login', { replace: true })
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete your account.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const subTransactions = transactions.filter((t) => t.type === 'subscription')
@@ -392,28 +411,64 @@ export function ProfilePage() {
       </Card>
       </div>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open)
+          if (!open) {
+            setDeleteConfirm('')
+            setDeletePassword('')
+            setDeleteError(null)
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes your account, store, products, and orders from this device.
-              Type your store name <strong>{user.businessName}</strong> to confirm.
+              This permanently deletes your account, store, products, and orders — on this device
+              and on the server. Type your store name <strong>{user.businessName}</strong> and enter
+              your password to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input
-            value={deleteConfirm}
-            onChange={(e) => setDeleteConfirm(e.target.value)}
-            placeholder={user.businessName}
-            aria-label="Confirm store name"
-          />
+          <div className="space-y-3">
+            <Input
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder={user.businessName}
+              aria-label="Confirm store name"
+              disabled={deleting}
+            />
+            <Input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Your account password"
+              aria-label="Password"
+              autoComplete="current-password"
+              disabled={deleting}
+            />
+            {deleteError && (
+              <Alert variant="destructive" className="border-destructive/30">
+                <CircleAlert aria-hidden />
+                <AlertDescription>{deleteError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              disabled={deleteConfirm.trim() !== user.businessName}
-              onClick={handleDelete}
+              disabled={
+                deleting || deleteConfirm.trim() !== user.businessName || deletePassword.length === 0
+              }
+              onClick={(e) => {
+                // Keep the dialog open on failure so the error stays visible.
+                e.preventDefault()
+                void handleDelete()
+              }}
             >
-              Permanently delete
+              {deleting && <Loader2 className="size-4 animate-spin" />}
+              {deleting ? 'Deleting…' : 'Permanently delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

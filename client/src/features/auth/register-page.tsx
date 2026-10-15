@@ -35,6 +35,7 @@ import {
   isEmailRegistered,
   stagePendingRegistration,
 } from '@/lib/repos'
+import { clearAccountDeleted } from '@/lib/deleted-accounts'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { authErrorMessage, startSignup } from '@/services/auth-service'
 import { useAuth } from '@/state/auth-context'
@@ -201,6 +202,9 @@ export function RegisterPage() {
       }
       setSendingLink(true)
       try {
+        // An explicit new signup lifts any deletion tombstone for this email, so
+        // a user who deletes and later re-registers is not locked out.
+        clearAccountDeleted(email)
         // Stage the local account (password hashed locally) so the /auth/confirm
         // redirect can finalize it, then ask Supabase to email the link.
         await stagePendingRegistration({

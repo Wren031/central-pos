@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test:smoke": "node scripts/smoke.mjs",
     "test:offline": "node scripts/offline-test.mjs",
+    "test:account-status": "node scripts/account-status-test.mjs",
+    "test:delete-account": "node scripts/delete-account-test.mjs",
     "test:escpos": "node scripts/print-escpos-test.mjs",
     "test:raster": "node scripts/print-raster-test.mjs"
   },

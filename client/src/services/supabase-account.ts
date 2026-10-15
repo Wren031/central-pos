@@ -2,6 +2,7 @@ import { isEmailRegistered, registerUser } from '@/database/repos/auth'
 import { isOnline } from '@/offline/connectivity'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { AuthFlowError } from '@/services/auth-service'
+import { isAccountDeleted } from '@/lib/deleted-accounts'
 import type { User } from '@/lib/types'
 
 /**
@@ -28,6 +29,9 @@ export async function healLocalAccountViaSupabase(
   if (!isOnline() || !supabaseConfigured) return null
 
   const normalized = email.trim().toLowerCase()
+
+  // Never resurrect an account the user deliberately deleted on this device.
+  if (isAccountDeleted(normalized)) return null
 
   let result
   try {
