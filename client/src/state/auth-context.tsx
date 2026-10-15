@@ -37,7 +37,7 @@ interface AuthValue {
   suspended: boolean
   /** Clear the block and return to sign-in (used by the suspended screen). */
   acknowledgeSuspension: () => void
-  login: (email: string, password: string) => Promise<User>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<User>
   register: (input: {
     fullName: string
     address: string
@@ -185,12 +185,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [ready, user?.id, refresh])
 
   const login = React.useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberMe = true) => {
       pendingRef.current = true
       try {
         let u: User
         try {
-          u = await repoLogin(email, password)
+          u = await repoLogin(email, password, rememberMe)
         } catch (err) {
           // Local sign-in failed. If this account was created through Supabase
           // Auth (verified email, no local record yet) we repair it online —

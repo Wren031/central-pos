@@ -148,7 +148,7 @@ export function ReceiptDialog({
 
             <div>
               <p className="mt-3 text-center text-[0.91em]">Salamat po! Please come again.</p>
-              <p className="text-center text-[0.82em]">Powered by Central POS (demo)</p>
+              <p className="text-center text-[0.82em]">Powered by UniPOS (demo)</p>
             </div>
           </div>
         </div>

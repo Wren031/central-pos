@@ -2,7 +2,6 @@ import * as React from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
-  Check,
   CircleAlert,
   Eye,
   EyeOff,
@@ -102,55 +101,6 @@ function InputIcon({ icon: Icon }: { icon: typeof User }) {
       className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
       aria-hidden
     />
-  )
-}
-
-function StepIndicator({ current }: { current: 1 | 2 }) {
-  const steps = [
-    { n: 1 as const, label: 'Account details' },
-    { n: 2 as const, label: 'Confirm email' },
-  ]
-  return (
-    <ol className="mb-6 flex items-center gap-3" aria-label={`Step ${current} of 2`}>
-      {steps.map((s, i) => {
-        const done = current > s.n
-        const active = current === s.n
-        return (
-          <React.Fragment key={s.n}>
-            {i > 0 && (
-              <span
-                className={cn('h-px w-8 transition-colors', done ? 'bg-foreground/30' : 'bg-border')}
-                aria-hidden
-              />
-            )}
-            <li
-              className="flex items-center gap-2"
-              aria-current={active ? 'step' : undefined}
-            >
-              <span
-                className={cn(
-                  'flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
-                  active && 'bg-primary text-primary-foreground',
-                  done && 'bg-foreground/10 text-foreground',
-                  !active && !done && 'bg-muted text-muted-foreground'
-                )}
-                aria-hidden
-              >
-                {done ? <Check className="size-3.5" /> : s.n}
-              </span>
-              <span
-                className={cn(
-                  'text-xs font-medium',
-                  active ? 'text-foreground' : 'text-muted-foreground'
-                )}
-              >
-                {s.label}
-              </span>
-            </li>
-          </React.Fragment>
-        )
-      })}
-    </ol>
   )
 }
 
@@ -260,7 +210,6 @@ export function RegisterPage() {
           </>
         }
       >
-        <StepIndicator current={2} />
         <ConfirmEmailStep
           email={pendingValues.current?.email.trim().toLowerCase() ?? ''}
           onBack={handleBack}
@@ -291,8 +240,6 @@ export function RegisterPage() {
         </>
       }
     >
-      <StepIndicator current={1} />
-
       <Form {...form} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {!online && (
           <div className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/[0.06] px-3.5 py-3 text-sm font-medium text-amber-700 dark:text-amber-400">

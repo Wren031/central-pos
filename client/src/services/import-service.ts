@@ -41,7 +41,7 @@ export async function importDatabase(json: string): Promise<ImportResult> {
   }
   const result = payloadSchema.safeParse(parsed)
   if (!result.success) {
-    throw new Error('That file is not a valid Central POS backup.')
+    throw new Error('That file is not a valid UniPOS backup.')
   }
   const data = result.data.data
   // Restore passwordHash-less users with a legacy placeholder hash — the

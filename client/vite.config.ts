@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Central POS',
-        short_name: 'Central POS',
+        name: 'UniPOS',
+        short_name: 'UniPOS',
         description: 'Offline-first point of sale (demo)',
         theme_color: '#0f172a',
         background_color: '#0f172a',

@@ -73,13 +73,13 @@ export function AuthLayout({
         </div>
 
         <div className="relative">
-          <Link to="/" aria-label="Central POS home" className="inline-flex">
+          <Link to="/" aria-label="UniPOS home" className="inline-flex">
             <div className="flex items-center gap-2.5">
               <div className="flex size-9 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
                 <Store className="size-5" aria-hidden />
               </div>
               <div className="leading-tight">
-                <div className="text-sm font-semibold tracking-tight">Central POS</div>
+                <div className="text-sm font-semibold tracking-tight">UniPOS</div>
                 <div className="text-[11px] text-white/55">Philippine Subscription Platform</div>
               </div>
             </div>
@@ -147,7 +147,7 @@ export function AuthLayout({
       {/* Form column */}
       <div className="flex flex-col bg-muted/30 lg:min-h-0">
         <header className="flex items-center justify-between border-b bg-background/80 px-4 py-4 backdrop-blur sm:px-8 lg:hidden">
-          <Link to="/" aria-label="Central POS home">
+          <Link to="/" aria-label="UniPOS home">
             <Brand />
           </Link>
         </header>

@@ -357,7 +357,7 @@ export function AppShell() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold leading-tight">
-                  {store?.onboarded ? store.name : 'Central POS'}
+                  {store?.onboarded ? store.name : 'UniPOS'}
                 </p>
                 <p className="truncate text-[11px] text-muted-foreground">
                   {store?.onboarded ? posDef?.name : 'Complete onboarding'}

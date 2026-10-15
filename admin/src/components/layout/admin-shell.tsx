@@ -90,7 +90,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Database className="size-[18px]" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight text-foreground">Central POS</p>
+          <p className="truncate text-sm font-semibold leading-tight text-foreground">UniPOS</p>
           <p className="truncate text-[11px] text-muted-foreground">Admin Console</p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export function AdminShell() {
                 {pageTitle}
               </p>
               <p className="hidden text-xs text-muted-foreground sm:block">
-                Central POS subscription management
+                UniPOS subscription management
               </p>
             </div>
             <Badge

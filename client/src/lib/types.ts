@@ -302,6 +302,11 @@ export interface SyncConflict {
 
 export interface SessionRow extends Session {
   id: string
+  /**
+   * false → the session must NOT be auto-restored after the browser/app is
+   * closed (the "Remember me" checkbox was off). Undefined/true → persistent.
+   */
+  rememberMe?: boolean
 }
 
 export interface PosConfigRecord {

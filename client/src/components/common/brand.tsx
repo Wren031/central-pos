@@ -20,7 +20,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
       <BrandMark />
       {!compact && (
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-tight">Central POS</div>
+          <div className="text-sm font-semibold tracking-tight">UniPOS</div>
           <div className="text-[11px] text-muted-foreground">Subscription Platform</div>
         </div>
       )}

@@ -50,7 +50,7 @@ import type { PosRelease, PosType, SubscriptionPlan } from '@/lib/types'
 /* -------------------------------------------------------------------------- */
 
 const SITE = {
-  name: 'Central POS',
+  name: 'UniPOS',
   tagline: 'Offline-first point of sale for every kind of store',
   contactEmail: 'support@centralpos.ph',
 }
@@ -161,7 +161,7 @@ const HOW_IT_WORKS = [
 
 const FAQS = [
   {
-    q: 'Does Central POS really work offline?',
+    q: 'Does UniPOS really work offline?',
     a: 'Yes. The POS app stores products, sales, and reports in an on-device database. You can ring up sales, print receipts, and view reports with no internet connection. Data syncs to the cloud when a connection is available.',
   },
   {
@@ -174,7 +174,7 @@ const FAQS = [
   },
   {
     q: 'Can I print receipts?',
-    a: 'Yes. Central POS supports ESC/POS receipt printing, including Bluetooth thermal printers — pair the printer, pick it in POS settings, and print with every sale.',
+    a: 'Yes. UniPOS supports ESC/POS receipt printing, including Bluetooth thermal printers — pair the printer, pick it in POS settings, and print with every sale.',
   },
   {
     q: 'Can I switch POS types later?',
@@ -352,7 +352,7 @@ function ProductPreview() {
           <span className="size-2.5 rounded-full bg-amber-400" />
           <span className="size-2.5 rounded-full bg-emerald-400" />
           <span className="ml-3 text-[11px] font-medium text-muted-foreground">
-            Central POS — BBQ layout
+            UniPOS — BBQ layout
           </span>
         </div>
         <div className="grid grid-cols-[88px_1fr_128px] sm:grid-cols-[110px_1fr_150px]">
@@ -772,7 +772,7 @@ function DownloadSection() {
           id="download"
           eyebrow="Download"
           title="Get the POS app"
-          description="Install Central POS on your device and start selling. Only published releases are shown."
+          description="Install UniPOS on your device and start selling. Only published releases are shown."
         />
 
         <div className="mx-auto mt-12 max-w-2xl">
@@ -832,7 +832,7 @@ function DownloadSection() {
               <ol className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                 <li>1. Download the APK file to your device.</li>
                 <li>2. Open the file and allow “install from this source” if prompted.</li>
-                <li>3. Tap Install, then open Central POS and register your store.</li>
+                <li>3. Tap Install, then open UniPOS and register your store.</li>
               </ol>
             </div>
             <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-xs">
@@ -843,7 +843,7 @@ function DownloadSection() {
               <ol className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                 <li>1. Download the installer when a Windows build is published.</li>
                 <li>2. Run the installer and follow the setup wizard.</li>
-                <li>3. Launch Central POS from your Start menu and register.</li>
+                <li>3. Launch UniPOS from your Start menu and register.</li>
               </ol>
             </div>
           </div>
@@ -911,13 +911,13 @@ function FaqSection() {
 /* Footer + legal dialogs                                                       */
 /* -------------------------------------------------------------------------- */
 
-const PRIVACY_POLICY = `Central POS collects only the information needed to run your store account: your name, business name, contact number, store address, and email address. Sales and product data are stored on your own device and are not uploaded unless a future sync feature is enabled.
+const PRIVACY_POLICY = `UniPOS collects only the information needed to run your store account: your name, business name, contact number, store address, and email address. Sales and product data are stored on your own device and are not uploaded unless a future sync feature is enabled.
 
 We use Supabase (hosted PostgreSQL and authentication) to store account profiles, store records, and subscription status. We do not sell your data. Payment records in this system are mock entries for demonstration and are not connected to a real payment gateway.
 
 You may request export or deletion of your account data at any time by contacting ${SITE.contactEmail}.`
 
-const TERMS_OF_SERVICE = `By using Central POS you agree to use the software for lawful business purposes and to keep your account credentials secure.
+const TERMS_OF_SERVICE = `By using UniPOS you agree to use the software for lawful business purposes and to keep your account credentials secure.
 
 Subscriptions grant access for the purchased period (weekly, monthly, or yearly) and begin after the 30-day free trial. Subscription fees are non-refundable once a period has started, except where required by law.
 

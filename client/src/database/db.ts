@@ -2,6 +2,7 @@ import { db } from './schema'
 import { migrateLegacyIfNeeded } from './migrate-legacy'
 import { hydratePosCatalog } from './repos/pos-catalog'
 import { replaceCache, resetCache, type CacheState } from './cache'
+import { hasEphemeralSession } from '@/lib/login-persistence'
 import type {
   AppNotification,
   Category,
@@ -68,6 +69,14 @@ export async function loadUserScopedCache(userId: string): Promise<CacheState> {
 async function hydrate(): Promise<void> {
   const sessionRow = await db.sessions.get('current')
   if (!sessionRow) {
+    resetCache()
+    return
+  }
+  // "Remember me" OFF: the session is only valid within the browser session it
+  // was created in. If the ephemeral marker is gone (tab/browser was closed),
+  // discard the session instead of auto-restoring it.
+  if (sessionRow.rememberMe === false && !hasEphemeralSession()) {
+    await db.sessions.delete('current')
     resetCache()
     return
   }

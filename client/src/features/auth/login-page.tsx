@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   Form,
   FormControl,
@@ -34,6 +36,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [serverError, setServerError] = React.useState<string | null>(null)
   const [suspended, setSuspended] = React.useState(false)
+  const [rememberMe, setRememberMe] = React.useState(true)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -54,7 +57,7 @@ export function LoginPage() {
     setServerError(null)
     setSuspended(false)
     try {
-      const u = await login(values.email, values.password)
+      const u = await login(values.email, values.password, rememberMe)
       toast.success(`Welcome back, ${u.fullName.split(' ')[0]}!`)
       navigate(from, { replace: true })
     } catch (err) {
@@ -75,9 +78,9 @@ export function LoginPage() {
       subtitle="Sign in to continue to your POS workspace."
       footer={
         <>
-          New to Central POS?{' '}
+          New to UniPOS?{' '}
           <Link to="/register" className="font-medium text-foreground underline underline-offset-4">
-            Start your 30-day free trial
+            Create an account
           </Link>
         </>
       }
@@ -161,6 +164,20 @@ export function LoginPage() {
             </FormItem>
           )}
         />
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="remember-me"
+            checked={rememberMe}
+            onCheckedChange={(value) => setRememberMe(value === true)}
+            disabled={submitting}
+          />
+          <Label
+            htmlFor="remember-me"
+            className="text-sm font-normal text-muted-foreground"
+          >
+            Remember me
+          </Label>
+        </div>
         <Button type="submit" size="lg" className="h-11 w-full" disabled={submitting}>
           {submitting && <Loader2 className="size-4 animate-spin" />}
           {submitting ? 'Signing in…' : 'Sign in'}

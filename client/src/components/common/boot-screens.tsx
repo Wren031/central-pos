@@ -32,7 +32,7 @@ export function DatabaseErrorScreen({
         <div className="w-full rounded-xl border border-destructive/30 bg-destructive/5 p-5">
           <p className="text-sm font-semibold text-destructive">Local database unavailable</p>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Central POS stores data locally in your browser (IndexedDB). This device blocked
+            UniPOS stores data locally in your browser (IndexedDB). This device blocked
             that storage — try a normal window, disable private mode, or free up space.
           </p>
           <p className="mt-3 rounded-md bg-muted px-3 py-2 font-mono text-[11px] break-all text-muted-foreground">

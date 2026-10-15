@@ -9,6 +9,7 @@ import { isOnline } from '@/offline/connectivity'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { clearSuspendedMarker } from '@/lib/account-status'
 import { markAccountDeleted } from '@/lib/deleted-accounts'
+import { clearEphemeralSession, markEphemeralSession } from '@/lib/login-persistence'
 import type { NotificationPrefs, PendingRegistration, PosTypeId, Store, Subscription, User } from '@/lib/types'
 
 /* ---------- users & session ---------- */
@@ -61,7 +62,7 @@ async function createLocalAccount(input: {
     id: newId('ntf'),
     userId: user.id,
     kind: 'welcome' as const,
-    title: 'Welcome to Central POS! 🎉',
+    title: 'Welcome to UniPOS! 🎉',
     body: 'Your 30-day free trial is now active. Choose a POS type to start selling.',
     read: false,
     createdAt: now,
@@ -169,7 +170,11 @@ export async function finalizePendingRegistration(email: string): Promise<User |
   return user
 }
 
-export async function login(email: string, password: string): Promise<User> {
+export async function login(
+  email: string,
+  password: string,
+  rememberMe = true
+): Promise<User> {
   await latency()
   const user = await db.users.where('email').equals(email.trim().toLowerCase()).first()
   if (!user) throw new Error('Invalid email or password.')
@@ -186,7 +191,10 @@ export async function login(email: string, password: string): Promise<User> {
     }
   }
   const now = nowIso()
-  await db.sessions.put({ id: 'current', userId: user.id, loggedInAt: now })
+  await db.sessions.put({ id: 'current', userId: user.id, loggedInAt: now, rememberMe })
+  // "Remember me" OFF → only survive within this browser session.
+  if (rememberMe) clearEphemeralSession()
+  else markEphemeralSession()
   await refreshCacheForUser(user.id)
   return user
 }

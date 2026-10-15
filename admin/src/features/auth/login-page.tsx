@@ -55,7 +55,7 @@ export function LoginPage() {
             <LogIn className="size-7" aria-hidden />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Central POS Admin
+            UniPOS Admin
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Sign in to manage subscriptions, stores, and payments.

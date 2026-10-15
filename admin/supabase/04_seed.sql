@@ -1,5 +1,5 @@
 -- ============================================================================
--- Central POS — Admin Dashboard: 04_seed.sql
+-- UniPOS — Admin Dashboard: 04_seed.sql
 -- Run LAST (after 01-03). Idempotent: skips demo users that already exist;
 -- plans/pos types/settings use ON CONFLICT DO NOTHING.
 -- ============================================================================
@@ -143,7 +143,7 @@ on conflict (id) do nothing;
 -- System settings
 -- ---------------------------------------------------------------------------
 insert into public.system_settings (key, value, description) values
-  ('platform_name',        '"Central POS"',        'Display name of the platform'),
+  ('platform_name',        '"UniPOS"',        'Display name of the platform'),
   ('support_email',        '"support@centralpos.ph"', 'Support contact shown to stores'),
   ('currency',             '"PHP"',                'Billing currency'),
   ('trial_days',           '30',                   'Default free trial length in days'),
@@ -347,7 +347,7 @@ on conflict (idempotency_key) do nothing;
 -- Final audit rows
 -- ---------------------------------------------------------------------------
 insert into public.activity_logs (actor_id, action, entity, entity_id, summary, metadata, created_at) values
-  (null, 'system.setup', 'system', null, 'Installed Central POS admin schema', '{"source":"04_seed.sql"}'::jsonb, now() - interval '1 day'),
+  (null, 'system.setup', 'system', null, 'Installed UniPOS admin schema', '{"source":"04_seed.sql"}'::jsonb, now() - interval '1 day'),
   (null, 'system.seed',  'system', null, 'Seeded demo data (18 customers, 18 stores, plans, payments)', '{"source":"04_seed.sql"}'::jsonb, now() - interval '1 day'),
   (null, 'user.suspend', 'profile', (select id::text from public.profiles where email = 'raffy@raffygrocery.ph'),
    'Suspended Raffy Mart for unpaid weekly plan', '{"reason":"payment overdue","source":"sql-seed"}'::jsonb, now() - interval '3 days'),
