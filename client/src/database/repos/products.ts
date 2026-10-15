@@ -2,6 +2,7 @@ import { db } from '../schema'
 import { getCache, patchCache } from '../cache'
 import { latency, newId, nowIso, syncOpFor, putSyncOp } from './helpers'
 import { notifySyncQueueChanged } from '@/offline/sync-manager'
+import { DEFAULT_UNIT } from '@/lib/units'
 import type { Product, StockMovement, StockMovementType } from '@/lib/types'
 
 export function getProducts(storeId: string): Product[] {
@@ -10,7 +11,15 @@ export function getProducts(storeId: string): Product[] {
 
 export async function addProduct(
   storeId: string,
-  input: { name: string; category: string; price: number; stock: number; emoji: string; image?: string }
+  input: {
+    name: string
+    category: string
+    price: number
+    stock: number
+    unit?: string
+    emoji: string
+    image?: string
+  }
 ): Promise<Product> {
   await latency(140)
   const sku = `${(await storePosPrefix(storeId)).slice(0, 3).toUpperCase()}-${newId('').slice(1, 5).toUpperCase()}`
@@ -23,6 +32,7 @@ export async function addProduct(
     category: input.category.trim() || 'Uncategorized',
     price: input.price,
     stock: input.stock,
+    unit: input.unit?.trim() || DEFAULT_UNIT,
     emoji: input.emoji || '📦',
     image: input.image || undefined,
     active: true,
@@ -57,7 +67,9 @@ export async function addProduct(
 
 export async function updateProduct(
   productId: string,
-  patch: Partial<Pick<Product, 'name' | 'category' | 'price' | 'stock' | 'emoji' | 'image' | 'active'>>
+  patch: Partial<
+    Pick<Product, 'name' | 'category' | 'price' | 'stock' | 'unit' | 'emoji' | 'image' | 'active'>
+  >
 ): Promise<Product> {
   await latency(110)
   const existing = await db.products.get(productId)

@@ -42,7 +42,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, peso } from '@/lib/format'
-import { PLAN_LABELS, changePassword, deleteAccount, updateProfile } from '@/lib/repos'
+import { planDisplayName } from '@/lib/plan-display'
+import { changePassword, deleteAccount, updateProfile } from '@/lib/repos'
 import { avatarImage } from '@/lib/mock-image'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
@@ -332,7 +333,7 @@ export function ProfilePage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Subscription &amp; billing</CardTitle>
           <CardDescription>
-            {PLAN_LABELS[sub?.plan ?? 'trial']} ·{' '}
+            {planDisplayName(sub)} ·{' '}
             {state.expiresAt ? `expires ${formatDate(state.expiresAt)}` : 'expired'} ·{' '}
             {peso(subTransactions.reduce((s, t) => s + t.amount, 0))} paid to date
           </CardDescription>

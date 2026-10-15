@@ -33,7 +33,8 @@ import { StatCard } from '@/components/common/stat-card'
 import { StatusBadge } from '@/components/common/status-badge'
 import { formatDate, formatDateTime, peso, relativeFromNow } from '@/lib/format'
 import { getPosType } from '@/lib/pos-types'
-import { getOrders, getProducts, PLAN_LABELS } from '@/lib/repos'
+import { planDisplayName } from '@/lib/plan-display'
+import { getOrders, getProducts } from '@/lib/repos'
 import { rangeCutoff, type DateRange } from '@/lib/date-range'
 import { productImage } from '@/lib/mock-image'
 import { mockClock } from '@/lib/mock-clock'
@@ -292,7 +293,7 @@ export function DashboardPage() {
               {state.canSell ? (
                 <div className="min-w-0">
                   <p className="font-medium">
-                    {sub?.plan === 'trial' ? 'Free trial' : `${PLAN_LABELS[sub?.plan ?? 'monthly']} subscription`}{' '}
+                    {sub?.plan === 'trial' ? 'Free trial' : `${planDisplayName(sub)} subscription`}{' '}
                     · <span className="text-emerald-700">{state.daysLeft} day{state.daysLeft === 1 ? '' : 's'} left</span>
                   </p>
                   <p className="text-xs text-muted-foreground">

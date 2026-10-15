@@ -11,6 +11,7 @@
 import { Canvas, WIDTH_PIXELS } from './canvas'
 import { ADVANCE, BASELINE, fold, glyph, embolden, minimumLeading } from './font'
 import { formatDateTime } from '../../format'
+import { unitLabel } from '../../units'
 import {
   DEFAULT_RECEIPT_LAYOUT,
   receiptFontStep,
@@ -227,7 +228,7 @@ export function buildRasterReceipt(order: Order, opts: RasterComposeOptions): Ui
       scale: bodyScale,
     })
     if (layout.showUnitPrice) {
-      rows.push({ text: `${item.qty} x ${two(item.price)}`, scale: bodyScale })
+      rows.push({ text: `${item.qty} ${unitLabel(item.unit)} x ${two(item.price)}`, scale: bodyScale })
     }
   }
   rows.push({ rule: 'dash' })

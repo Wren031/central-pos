@@ -11,6 +11,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { printerService } from '@/database/repos/printer'
 import { formatDateTime, peso } from '@/lib/format'
+import { formatQty } from '@/lib/units'
 import { RECEIPT_FONT_PX, type Order } from '@/lib/types'
 
 /**
@@ -98,7 +99,7 @@ export function ReceiptDialog({
                   {order.items.map((it) => (
                     <tr key={it.productId}>
                       <td className="py-0.5 pr-1">{it.name}</td>
-                      <td className="py-0.5 text-center">{it.qty}</td>
+                      <td className="py-0.5 text-center">{formatQty(it.qty, it.unit)}</td>
                       <td className="py-0.5 text-right">{peso(it.price * it.qty)}</td>
                     </tr>
                   ))}

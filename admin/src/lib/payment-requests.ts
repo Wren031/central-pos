@@ -14,7 +14,9 @@ export async function fetchPaymentRequests(): Promise<PaymentRequest[]> {
   const { data, error } = await supabase
     .from('payment_requests')
     .select(
-      '*, user:profiles(id, full_name, email, business_name), plan:subscription_plans(id, name, duration_days, price)'
+      // `!user_id` disambiguates the FK: payment_requests has two FKs to
+      // profiles (user_id and reviewed_by), so PostgREST needs the hint.
+      '*, user:profiles!user_id(id, full_name, email, business_name), plan:subscription_plans(id, name, duration_days, price)'
     )
     .order('created_at', { ascending: false })
   if (error) throw new Error(errorMessage(error))
@@ -60,20 +62,52 @@ export async function linkPaymentRequest(id: string, userId: string): Promise<vo
   if (error) throw new Error(errorMessage(error))
 }
 
-/** Reads the configured GCash QR image URL (empty string when unset). */
-export async function fetchGcashQrUrl(): Promise<string> {
+/** GCash QR configuration stored under the `gcash_qr` system setting. */
+export interface GcashQrSetting {
+  /** Public image URL, or '' when unset. */
+  url: string
+  /** When false the POS client shows a "not configured" notice. */
+  active: boolean
+}
+
+/** Reads the configured GCash QR (url + active) from system_settings. */
+export async function fetchGcashQr(): Promise<GcashQrSetting> {
   const { data, error } = await supabase
     .from('system_settings')
     .select('value')
     .eq('key', GCASH_QR_SETTING_KEY)
     .maybeSingle()
   if (error) throw new Error(errorMessage(error))
-  const value = data?.value as { url?: string } | null | undefined
-  return value?.url?.trim() ?? ''
+  const value = data?.value as { url?: string; active?: boolean } | null | undefined
+  return {
+    url: value?.url?.trim() ?? '',
+    active: value?.active ?? true,
+  }
+}
+
+/** Merges a partial QR config into the `gcash_qr` system setting. */
+async function writeGcashQr(patch: Partial<GcashQrSetting>): Promise<GcashQrSetting> {
+  const current = await fetchGcashQr()
+  const next: GcashQrSetting = {
+    url: patch.url !== undefined ? patch.url.trim() : current.url,
+    active: patch.active !== undefined ? patch.active : current.active,
+  }
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      {
+        key: GCASH_QR_SETTING_KEY,
+        value: next,
+        description: 'GCash QR code image URL shown on the POS client subscription payment page.',
+      },
+      { onConflict: 'key' }
+    )
+  if (error) throw new Error(errorMessage(error))
+  return next
 }
 
 /** Replaces the QR image asset and points the system setting at its public URL. */
-export async function setGcashQrFromFile(file: File): Promise<string> {
+export async function setGcashQrFromFile(file: File): Promise<GcashQrSetting> {
   const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_')
   const path = `gcash-qr-${Date.now()}-${safeName}`
   const { error: upErr } = await supabase.storage
@@ -81,31 +115,16 @@ export async function setGcashQrFromFile(file: File): Promise<string> {
     .upload(path, file, { upsert: false, contentType: file.type || undefined })
   if (upErr) throw new Error(errorMessage(upErr))
   const publicUrl = supabase.storage.from(ASSET_BUCKET).getPublicUrl(path).data.publicUrl
-  const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      {
-        key: GCASH_QR_SETTING_KEY,
-        value: { url: publicUrl },
-        description: 'GCash QR code image URL shown on the POS client subscription payment page.',
-      },
-      { onConflict: 'key' }
-    )
-  if (error) throw new Error(errorMessage(error))
-  return publicUrl
+  return writeGcashQr({ url: publicUrl, active: true })
 }
 
 /** Points the QR setting at an external URL (no upload). */
-export async function setGcashQrUrl(url: string): Promise<void> {
-  const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      {
-        key: GCASH_QR_SETTING_KEY,
-        value: { url: url.trim() },
-        description: 'GCash QR code image URL shown on the POS client subscription payment page.',
-      },
-      { onConflict: 'key' }
-    )
-  if (error) throw new Error(errorMessage(error))
+export async function setGcashQrUrl(url: string): Promise<GcashQrSetting> {
+  return writeGcashQr({ url })
 }
+
+/** Toggles whether the POS client may show the configured QR. */
+export async function setGcashQrActive(active: boolean): Promise<GcashQrSetting> {
+  return writeGcashQr({ active })
+}
+

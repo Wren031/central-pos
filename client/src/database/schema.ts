@@ -7,6 +7,7 @@ import type {
   OrderItemRecord,
   PaymentRequest,
   PendingRegistration,
+  PlanRecord,
   PosConfigRecord,
   PosTypeId,
   PosTypeRecord,
@@ -30,6 +31,7 @@ export class CposDatabase extends Dexie {
   posConfigs!: EntityTable<PosConfigRecord, 'id'>
   posCatalog!: EntityTable<PosTypeRecord, 'id'>
   posCatalogCategories!: EntityTable<PosCategoryRecord, 'id'>
+  planCatalog!: EntityTable<PlanRecord, 'id'>
   categories!: EntityTable<Category, 'id'>
   products!: EntityTable<Product, 'id'>
   stockMovements!: EntityTable<StockMovement, 'id'>
@@ -74,6 +76,9 @@ export class CposDatabase extends Dexie {
     this.version(4).stores({
       posCatalog: 'id, active, sortOrder',
       posCatalogCategories: 'id, posTypeId, categoryId',
+    })
+    this.version(5).stores({
+      planCatalog: 'id, active, sortOrder',
     })
   }
 }

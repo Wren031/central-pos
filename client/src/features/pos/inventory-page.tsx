@@ -63,6 +63,7 @@ import {
 import { EmptyState } from '@/components/common/empty-state'
 import { peso } from '@/lib/format'
 import { fileToProductImage, productImage } from '@/lib/mock-image'
+import { DEFAULT_UNIT, PRODUCT_UNITS, formatQty, unitLabel } from '@/lib/units'
 import { getCategories, addProduct, deleteProduct, getProducts, updateProduct } from '@/lib/repos'
 import type { Product } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -75,6 +76,7 @@ const schema = z.object({
   category: z.string().min(1, 'Pick a category.'),
   price: z.number().min(0.01, 'Price must be greater than 0.'),
   stock: z.number().int('Stock must be a whole number.').min(0, 'Cannot be negative.'),
+  unit: z.string(),
   image: z.string().optional(),
 })
 
@@ -97,7 +99,7 @@ function ProductDialog({
 }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', category: categories[0] ?? '', price: 0, stock: 0, image: '' },
+    defaultValues: { name: '', category: categories[0] ?? '', price: 0, stock: 0, unit: DEFAULT_UNIT, image: '' },
   })
 
   const fileRef = React.useRef<HTMLInputElement>(null)
@@ -112,10 +114,11 @@ function ProductDialog({
           category: product.category,
           price: product.price,
           stock: product.stock,
+          unit: product.unit ?? DEFAULT_UNIT,
           image: product.image ?? '',
         })
       } else {
-        form.reset({ name: '', category: categories[0] ?? '', price: 0, stock: 0, image: '' })
+        form.reset({ name: '', category: categories[0] ?? '', price: 0, stock: 0, unit: DEFAULT_UNIT, image: '' })
       }
     }
   }, [open, product, categories, form])
@@ -164,6 +167,7 @@ function ProductDialog({
 
   const nameValue = form.watch('name')
   const imageValue = form.watch('image')
+  const unitValue = form.watch('unit')
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -325,7 +329,7 @@ function ProductDialog({
                           />
                         </div>
                       </FormControl>
-                      <p className="text-[11px] text-muted-foreground">Price per item at checkout.</p>
+                      <p className="text-[11px] text-muted-foreground">Price per {unitLabel(unitValue)} at checkout.</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -341,16 +345,43 @@ function ProductDialog({
                           <Input
                             inputMode="numeric"
                             placeholder="0"
-                            className="pr-14 tabular-nums"
+                            className="pr-16 tabular-nums"
                             value={String(field.value)}
                             onChange={(e) => field.onChange(Math.floor(Number(e.target.value) || 0))}
                           />
                           <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                            units
+                            {unitLabel(unitValue)}
                           </span>
                         </div>
                       </FormControl>
                       <p className="text-[11px] text-muted-foreground">Low-stock alert at 10 or fewer.</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="unit"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Unit of measure</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a unit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PRODUCT_UNITS.map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        How this item is counted — applied to pricing and stock (pc, bottle, kg…).
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -522,7 +553,7 @@ export function InventoryPage() {
                   <TableCell className="text-right tabular-nums">{peso(p.price)}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={p.stock === 0 ? 'destructive' : p.stock <= 10 ? 'outline' : 'secondary'} className="tabular-nums">
-                      {p.stock}
+                      {formatQty(p.stock, p.unit)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">

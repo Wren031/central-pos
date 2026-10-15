@@ -44,16 +44,26 @@ export {
   getSubscription,
   computeSubState,
   getSubState,
-  purchasePlan,
+  activatePlanFromServer,
   getTransactions,
 } from '@/database/repos/subscription'
 
 export {
   getPaymentRequests,
   getPendingPaymentRequest,
-  submitPaymentRequest,
-  applyPaymentReview,
+  persistPaymentRequest,
+  reconcileServerRequest,
+  addNotification,
 } from '@/database/repos/payment-requests'
+
+export {
+  getPlanRecords,
+  getAllPlanRecords,
+  getPlanRecord,
+  isPlanCatalogEmpty,
+  getGcashQrConfig,
+  hydratePlanCatalog,
+} from '@/database/repos/plan-catalog'
 
 export {
   getNotifications,
@@ -65,8 +75,6 @@ export { getCustomers, addCustomer, updateCustomer, deleteCustomer } from '@/dat
 export { getCategories, addCategory } from '@/database/repos/categories'
 export { printerService } from '@/database/repos/printer'
 export type { PrinterState } from '@/database/repos/printer'
-
-export { PLAN_DAYS, PLAN_PRICES, PLAN_LABELS } from '@/lib/plan-constants'
 
 /**
  * Legacy no-op kept for import compatibility.

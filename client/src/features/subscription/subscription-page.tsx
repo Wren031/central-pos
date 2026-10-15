@@ -9,7 +9,9 @@ import {
   FileText,
   Hourglass,
   QrCode,
+  RefreshCw,
   Sparkles,
+  WifiOff,
   XCircle,
   Zap,
 } from 'lucide-react'
@@ -18,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -30,37 +33,14 @@ import { EmptyState } from '@/components/common/empty-state'
 import { PageHeader } from '@/components/common/page-header'
 import { StatusBadge } from '@/components/common/status-badge'
 import { formatDate, formatDateTime, peso } from '@/lib/format'
-import { PLAN_DAYS, PLAN_LABELS, PLAN_PRICES } from '@/lib/repos'
 import { cn } from '@/lib/utils'
-import type { PaymentRequest, PaymentRequestStatus, PlanId } from '@/lib/types'
+import { useOnlineStatus } from '@/hooks/use-online-status'
+import type { PaymentRequest, PaymentRequestStatus, PlanRecord } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 import { GcashPaymentDialog } from './gcash-payment-dialog'
 
-const PLAN_FEATURES: Record<Exclude<PlanId, 'trial'>, string[]> = {
-  weekly: ['Full POS workspace', 'Product catalog & inventory', 'Order history & receipts', 'Email support'],
-  monthly: [
-    'Everything in Weekly',
-    'Sales reports & analytics',
-    'Priority chat support',
-    'Free POS type changes',
-  ],
-  yearly: [
-    'Everything in Monthly',
-    '2 months free vs monthly',
-    'Dedicated onboarding call',
-    'Early access to new POS types',
-  ],
-}
-
-const PLAN_META: Record<
-  Exclude<PlanId, 'trial'>,
-  { icon: React.ElementType; highlight?: boolean; blurb: string }
-> = {
-  weekly: { icon: Zap, blurb: 'Try a plan week-to-week' },
-  monthly: { icon: BadgeCheck, highlight: true, blurb: 'Most popular for small stores' },
-  yearly: { icon: Crown, blurb: 'Best value — save ₱989' },
-}
+const PLAN_ICONS = [Zap, BadgeCheck, Crown] as const
 
 const REQUEST_STATUS: Record<PaymentRequestStatus, { label: string; className: string }> = {
   pending: {
@@ -86,10 +66,18 @@ function PaymentRequestStatusBadge({ status }: { status: PaymentRequestStatus })
   )
 }
 
+/** "week" / "month" / "year" for the common durations, else "N days". */
+function periodLabel(days: number): string {
+  if (days === 7) return 'week'
+  if (days === 30 || days === 31) return 'month'
+  if (days === 365 || days === 366) return 'year'
+  return `${days} days`
+}
+
 function TrialPanel() {
   const { state, sub } = useSubscription()
   if (!sub || sub.plan !== 'trial') return null
-  const total = 30
+  const total = sub.durationDays && sub.durationDays > 0 ? sub.durationDays : 30
   const used = Math.max(0, Math.min(total, total - state.daysLeft))
   const pct = Math.round((used / total) * 100)
   return (
@@ -98,7 +86,7 @@ function TrialPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4 text-emerald-600" aria-hidden />
-            30-day free trial
+            {total}-day free trial
           </CardTitle>
           <StatusBadge status={state.status} />
         </div>
@@ -142,7 +130,7 @@ function PendingBanner({ request }: { request: PaymentRequest }) {
       <Hourglass className="size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="font-medium">
-          GCash payment pending verification — {PLAN_LABELS[request.plan]} plan
+          GCash payment pending verification — {request.planName ?? request.plan} plan
         </p>
         <p className="text-xs text-amber-700/90">
           Reference <span className="font-mono">{request.referenceNo}</span> · submitted{' '}
@@ -154,18 +142,69 @@ function PendingBanner({ request }: { request: PaymentRequest }) {
   )
 }
 
+function PlanCardSkeleton() {
+  return (
+    <Card className="shadow-none">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-9 rounded-lg" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-16 w-full" />
+      </CardContent>
+      <CardFooter>
+        <Skeleton className="h-9 w-full" />
+      </CardFooter>
+    </Card>
+  )
+}
+
 export function SubscriptionPage() {
   const { user } = useAuth()
-  const { sub, state, transactions, paymentRequests } = useSubscription()
-  const [checkoutPlan, setCheckoutPlan] = React.useState<Exclude<PlanId, 'trial'> | null>(null)
+  const online = useOnlineStatus()
+  const {
+    sub,
+    state,
+    transactions,
+    paymentRequests,
+    plans,
+    plansLoading,
+    plansError,
+    gcashQr,
+    refreshRemote,
+  } = useSubscription()
+  const [checkoutPlan, setCheckoutPlan] = React.useState<PlanRecord | null>(null)
   const [checkoutOpen, setCheckoutOpen] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
 
   const subTransactions = transactions.filter((t) => t.type === 'subscription')
   const pendingRequest = paymentRequests.find((r) => r.status === 'pending') ?? null
+  const showSkeleton = plansLoading && plans.length === 0
+  const showError = !plansLoading && plans.length === 0 && Boolean(plansError)
+  const showEmpty = !plansLoading && plans.length === 0 && !plansError
 
-  function openCheckout(plan: Exclude<PlanId, 'trial'>) {
+  const currentPlanName =
+    sub?.planName ?? (sub?.plan === 'trial' ? 'Free trial' : sub?.plan ?? 'No plan')
+
+  function openCheckout(plan: PlanRecord) {
     setCheckoutPlan(plan)
     setCheckoutOpen(true)
+  }
+
+  async function checkStatus() {
+    setRefreshing(true)
+    try {
+      await refreshRemote()
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   return (
@@ -182,6 +221,14 @@ export function SubscriptionPage() {
         }
       />
 
+      {!online && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-600">
+          <WifiOff className="size-3.5 shrink-0" aria-hidden />
+          You are offline. Plans and the GCash QR shown below are the last saved versions — an
+          internet connection is required to submit a payment or check its status.
+        </div>
+      )}
+
       {pendingRequest && <PendingBanner request={pendingRequest} />}
 
       {sub && (
@@ -190,13 +237,14 @@ export function SubscriptionPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  {PLAN_LABELS[sub.plan]} plan
+                  {currentPlanName}
                   <StatusBadge status={state.status} />
                 </CardTitle>
                 <CardDescription>
                   {state.expiresAt ? (
                     <>
-                      Active until <strong className="font-medium text-foreground">{formatDate(state.expiresAt)}</strong>
+                      Active until{' '}
+                      <strong className="font-medium text-foreground">{formatDate(state.expiresAt)}</strong>
                       {state.canSell && (
                         <>
                           {' '}
@@ -211,15 +259,15 @@ export function SubscriptionPage() {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarDays className="size-4" aria-hidden />
-                {sub.pricePaid > 0 ? peso(sub.pricePaid) : 'No charge'} ·{' '}
-                {PLAN_DAYS[sub.plan as Exclude<PlanId, 'trial'>] ?? 30} days
+                {sub.pricePaid > 0 ? peso(sub.pricePaid) : 'No charge'}
+                {sub.durationDays ? ` · ${sub.durationDays} days` : ''}
               </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Current plan</p>
-              <p className="text-sm font-medium">{PLAN_LABELS[sub.plan]}</p>
+              <p className="text-sm font-medium">{currentPlanName}</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Start date</p>
@@ -236,98 +284,125 @@ export function SubscriptionPage() {
       <TrialPanel />
 
       <section aria-labelledby="plans-heading">
-        <h2 id="plans-heading" className="mb-3 text-lg font-semibold tracking-tight">
-          Choose a plan
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="plans-heading" className="text-lg font-semibold tracking-tight">
+            Choose a plan
+          </h2>
+          <Button variant="outline" size="sm" onClick={() => void checkStatus()} disabled={refreshing || !online}>
+            <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
+            Check for updates
+          </Button>
+        </div>
         <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
           <QrCode className="size-3.5" aria-hidden />
           Pay manually via GCash QR — a pending request is created for admin verification.
         </p>
-        <div className="mt-2 grid gap-4 md:grid-cols-3">
-          {(['weekly', 'monthly', 'yearly'] as const).map((plan) => {
-            const meta = PLAN_META[plan]
-            const Icon = meta.icon
-            const isCurrent = sub?.plan === plan && state.canSell
-            return (
-              <Card
-                key={plan}
-                className={cn(
-                  'relative flex flex-col overflow-visible shadow-none',
-                  meta.highlight && 'border-primary/40 shadow-md ring-1 ring-primary/20'
-                )}
-              >
-                {meta.highlight && (
-                  <span className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground shadow-sm">
-                    Most popular
-                  </span>
-                )}
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'flex size-9 items-center justify-center rounded-lg',
-                        meta.highlight ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      )}
-                    >
-                      <Icon className="size-4" aria-hidden />
-                    </span>
-                    <div>
-                      <CardTitle className="text-base">{PLAN_LABELS[plan]}</CardTitle>
-                      <CardDescription className="text-xs">{meta.blurb}</CardDescription>
+
+        {showSkeleton ? (
+          <div className="mt-2 grid gap-4 md:grid-cols-3">
+            <PlanCardSkeleton />
+            <PlanCardSkeleton />
+            <PlanCardSkeleton />
+          </div>
+        ) : showError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+            <EmptyState
+              icon={WifiOff}
+              title="Couldn’t load subscription plans"
+              description={plansError ?? 'Please try again.'}
+              className="border-0 bg-transparent py-10"
+              action={
+                <Button variant="outline" size="sm" onClick={() => void checkStatus()} disabled={refreshing}>
+                  <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
+                  Retry
+                </Button>
+              }
+            />
+          </div>
+        ) : showEmpty ? (
+          <EmptyState
+            icon={FileText}
+            title="No plans available right now"
+            description="The administrator hasn’t published any active subscription plans yet. Please check back soon."
+          />
+        ) : (
+          <div className="mt-2 grid gap-4 md:grid-cols-3">
+            {plans.map((plan, idx) => {
+              const Icon = PLAN_ICONS[idx % PLAN_ICONS.length]
+              const isCurrent = sub?.plan === plan.id && state.canSell
+              return (
+                <Card key={plan.id} className="relative flex flex-col overflow-visible shadow-none">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                        <Icon className="size-4" aria-hidden />
+                      </span>
+                      <div>
+                        <CardTitle className="text-base">{plan.name}</CardTitle>
+                        {plan.description && (
+                          <CardDescription className="text-xs">{plan.description}</CardDescription>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 space-y-4">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-semibold tracking-tight">
-                      {peso(PLAN_PRICES[plan]).replace('.00', '')}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      /{plan === 'weekly' ? 'week' : plan === 'monthly' ? 'month' : 'year'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Billed once · {PLAN_DAYS[plan]} days of access
-                    {plan === 'yearly' && (
-                      <span className="ml-1 font-medium text-emerald-600">(save ₱989)</span>
-                    )}
-                  </p>
-                  <Separator />
-                  <ul className="space-y-2">
-                    {PLAN_FEATURES[plan].map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm">
-                        <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={meta.highlight ? 'default' : 'outline'}
-                    disabled={isCurrent}
-                    onClick={() => openCheckout(plan)}
-                  >
-                    {isCurrent ? (
+                  </CardHeader>
+                  <CardContent className="flex-1 space-y-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-semibold tracking-tight">
+                        {peso(plan.price).replace('.00', '')}
+                      </span>
+                      <span className="text-sm text-muted-foreground">/{periodLabel(plan.durationDays)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Billed once · {plan.durationDays} days of access
+                    </p>
+                    {plan.features.length > 0 && (
                       <>
-                        <BadgeCheck className="size-4" /> Current plan
-                      </>
-                    ) : state.status === 'expired' ? (
-                      <>
-                        <Clock className="size-4" /> Renew with {PLAN_LABELS[plan]}
-                      </>
-                    ) : (
-                      <>
-                        <QrCode className="size-4" /> Pay {PLAN_LABELS[plan]} via GCash
+                        <Separator />
+                        <ul className="space-y-2">
+                          {plan.features.map((f) => (
+                            <li key={f} className="flex items-start gap-2 text-sm">
+                              <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
                       </>
                     )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            )
-          })}
-        </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      disabled={isCurrent || !online}
+                      title={!online ? 'Connect to the internet to purchase a plan' : undefined}
+                      onClick={() => openCheckout(plan)}
+                    >
+                      {isCurrent ? (
+                        <>
+                          <BadgeCheck className="size-4" /> Current plan
+                        </>
+                      ) : state.status === 'expired' ? (
+                        <>
+                          <Clock className="size-4" /> Renew with {plan.name}
+                        </>
+                      ) : (
+                        <>
+                          <QrCode className="size-4" /> Pay {plan.name} via GCash
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+
+        {plans.length > 0 && plansError && (
+          <p className="mt-3 text-xs text-amber-700">
+            Showing the last saved plans. {plansError}
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="requests-heading">
@@ -366,7 +441,7 @@ export function SubscriptionPage() {
                             </p>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">{PLAN_LABELS[r.plan]}</TableCell>
+                        <TableCell className="text-sm">{r.planName ?? r.plan}</TableCell>
                         <TableCell className="hidden text-muted-foreground sm:table-cell">
                           {formatDateTime(r.createdAt)}
                         </TableCell>
@@ -456,6 +531,8 @@ export function SubscriptionPage() {
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         plan={checkoutPlan}
+        gcashQrUrl={gcashQr.url}
+        gcashQrError={gcashQr.error ?? null}
         currentExpiry={state.canSell ? state.expiresAt : null}
       />
     </div>

@@ -1,17 +1,17 @@
 import * as React from 'react'
-import { CreditCard, Loader2, Pencil, Plus, QrCode, Save, SlidersHorizontal, UploadCloud, UserCog } from 'lucide-react'
+import { CreditCard, Loader2, Pencil, Plus, QrCode, Save, SlidersHorizontal, Trash2, UploadCloud, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAsync } from '@/hooks/use-async'
 import { errorMessage } from '@/lib/errors'
 import { formatDate, peso } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { fetchGcashQrUrl, setGcashQrFromFile, setGcashQrUrl } from '@/lib/payment-requests'
+import { fetchGcashQr, setGcashQrActive, setGcashQrFromFile, setGcashQrUrl } from '@/lib/payment-requests'
 import type { SubscriptionPlan, SystemSetting } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 import { PageHeader } from '@/components/common/page-header'
 import { Modal } from '@/components/common/modal'
-import { Card, ErrorState, LoadingRows, TableWrap } from '@/components/common/states'
+import { Card, ConfirmModal, ErrorState, LoadingRows, TableWrap } from '@/components/common/states'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -229,6 +229,7 @@ interface PlanForm {
 function PlansTab() {
   const [editing, setEditing] = React.useState<{ mode: 'create' | 'edit'; form: PlanForm } | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [deleteTarget, setDeleteTarget] = React.useState<SubscriptionPlan | null>(null)
 
   const plans = useAsync(async () => {
     const { data, error } = await supabase
@@ -276,14 +277,23 @@ function PlansTab() {
   async function saveForm() {
     if (!editing) return
     const { form, mode } = editing
-    if (!form.id.trim() || !form.name.trim() || form.duration_days < 1) {
+    const slug = form.id.trim().toLowerCase().replace(/\s+/g, '_')
+    if (!slug || !form.name.trim() || form.duration_days < 1) {
       toast.error('ID, name, and a positive duration are required.')
+      return
+    }
+    if (!/^[a-z][a-z0-9_]{1,30}$/.test(slug)) {
+      toast.error('ID must start with a letter and use only lowercase letters, numbers, and underscores.')
+      return
+    }
+    if (form.price < 0) {
+      toast.error('Price cannot be negative.')
       return
     }
     setBusy(true)
     try {
       const payload = {
-        id: form.id.trim().toLowerCase().replace(/\s+/g, '_'),
+        id: slug,
         name: form.name.trim(),
         description: form.description.trim() || null,
         duration_days: form.duration_days,
@@ -320,6 +330,21 @@ function PlansTab() {
         .eq('id', p.id)
       if (error) throw new Error(errorMessage(error))
       toast.success(`${p.name} ${p.active ? 'deactivated' : 'activated'}.`)
+      plans.reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function runDelete(plan: SubscriptionPlan) {
+    setBusy(true)
+    try {
+      const { error } = await supabase.rpc('admin_delete_plan', { target_plan: plan.id })
+      if (error) throw new Error(errorMessage(error))
+      toast.success(`${plan.name} deleted.`)
+      setDeleteTarget(null)
       plans.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -405,6 +430,17 @@ function PlansTab() {
                         <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(p)}>
                           <Pencil className="size-3.5" />
                           Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          disabled={busy}
+                          title="Delete plan"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          <Trash2 className="size-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -558,6 +594,21 @@ function PlansTab() {
           </div>
         )}
       </Modal>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete plan?"
+        busy={busy}
+        confirmLabel="Delete plan"
+        message={
+          <>
+            Delete <strong>{deleteTarget?.name}</strong>? Plans referenced by any subscription,
+            payment, or request cannot be deleted — deactivate them instead.
+          </>
+        }
+        onConfirm={() => deleteTarget && void runDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   )
 }
@@ -712,30 +763,40 @@ function ProfileTab() {
 /* GCash payments                                                      */
 /* ------------------------------------------------------------------ */
 
+const SUPPORTED_QR_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+const MAX_QR_BYTES = 2 * 1024 * 1024
+
 function PaymentsTab() {
   const [busy, setBusy] = React.useState(false)
   const [urlDraft, setUrlDraft] = React.useState('')
   const [loadedUrl, setLoadedUrl] = React.useState('')
+  const [active, setActive] = React.useState(true)
 
   const qr = useAsync(async () => {
-    const url = await fetchGcashQrUrl()
-    setLoadedUrl(url)
-    setUrlDraft(url)
-    return url
+    const cfg = await fetchGcashQr()
+    setLoadedUrl(cfg.url)
+    setUrlDraft(cfg.url)
+    setActive(cfg.active)
+    return cfg
   }, [])
 
   async function upload(file: File | null) {
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast.error('The QR code must be an image file.')
+    if (!SUPPORTED_QR_TYPES.includes(file.type)) {
+      toast.error('The QR code must be a PNG, JPG, or WebP image.')
+      return
+    }
+    if (file.size > MAX_QR_BYTES) {
+      toast.error('The QR code image must be 2 MB or smaller.')
       return
     }
     setBusy(true)
     try {
-      const url = await setGcashQrFromFile(file)
-      setLoadedUrl(url)
-      setUrlDraft(url)
-      toast.success('GCash QR code updated.')
+      const cfg = await setGcashQrFromFile(file)
+      setLoadedUrl(cfg.url)
+      setUrlDraft(cfg.url)
+      setActive(cfg.active)
+      toast.success('GCash QR code updated and activated.')
       qr.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -747,9 +808,23 @@ function PaymentsTab() {
   async function saveUrl() {
     setBusy(true)
     try {
-      await setGcashQrUrl(urlDraft)
-      setLoadedUrl(urlDraft.trim())
+      const cfg = await setGcashQrUrl(urlDraft)
+      setLoadedUrl(cfg.url)
       toast.success('GCash QR URL saved.')
+      qr.reload()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function toggleActive(next: boolean) {
+    setBusy(true)
+    try {
+      const cfg = await setGcashQrActive(next)
+      setActive(cfg.active)
+      toast.success(cfg.active ? 'QR code activated.' : 'QR code deactivated — hidden from customers.')
       qr.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -768,19 +843,39 @@ function PaymentsTab() {
         description="Customers scan this on the POS subscription page to pay manually."
       >
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {active ? 'Active — shown to customers' : 'Inactive — hidden from customers'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The POS client only ever displays the active QR code.
+              </p>
+            </div>
+            <Switch
+              size="sm"
+              checked={active}
+              disabled={busy || !loadedUrl}
+              onCheckedChange={(checked) => void toggleActive(checked)}
+            />
+          </div>
+
           <div className="flex min-h-52 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-3">
             {loadedUrl ? (
               <img
                 src={loadedUrl}
                 alt="GCash QR code"
-                className="max-h-64 w-auto rounded-md object-contain"
+                className={cn(
+                  'max-h-64 w-auto rounded-md object-contain',
+                  !active && 'opacity-40 grayscale'
+                )}
               />
             ) : (
               <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
                 <QrCode className="size-8" />
                 <p className="text-sm font-medium">No QR code configured</p>
                 <p className="max-w-xs text-xs">
-                  Upload your real GCash QR image below. The POS client shows a “not configured”
+                  Upload your real GCash QR image below. The POS client shows a "not configured"
                   notice until then — it never generates a fake QR.
                 </p>
               </div>
@@ -791,14 +886,14 @@ function PaymentsTab() {
             <Label>Upload QR image</Label>
             <input
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/webp"
               disabled={busy}
               className="flex w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
               onChange={(e) => void upload(e.target.files?.[0] ?? null)}
             />
             <p className="text-[11px] text-muted-foreground/70">
-              Uploaded to the public <code className="rounded bg-muted px-1 py-0.5">payment-assets</code>{' '}
-              bucket and shown to customers.
+              PNG, JPG, or WebP up to 2 MB. Uploaded to the public{' '}
+              <code className="rounded bg-muted px-1 py-0.5">payment-assets</code> bucket.
             </p>
           </div>
         </div>
@@ -840,8 +935,8 @@ function PaymentsTab() {
           </div>
           <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-700">
             <UploadCloud className="mr-1 inline size-3.5" />
-            Clearing the URL and saving removes the QR from the client (customers see the “not
-            configured” notice). No payment gateway is connected anywhere.
+            Clearing the URL and saving removes the QR from the client (customers see the "not
+            configured" notice). No payment gateway is connected anywhere.
           </div>
         </div>
       </Card>

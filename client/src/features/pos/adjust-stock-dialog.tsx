@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { formatDateTime } from '@/lib/format'
 import { adjustStock, getProductMovements, subscribeDb } from '@/lib/repos'
+import { formatQty } from '@/lib/units'
 import type { Product, StockMovement, StockMovementType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
@@ -79,7 +80,7 @@ export function AdjustStockDialog({
     setSaving(true)
     try {
       const updated = await adjustStock(product.id, signed, type, reason)
-      toast.success(`${product.name}: stock is now ${updated.stock}`)
+      toast.success(`${product.name}: stock is now ${formatQty(updated.stock, product.unit)}`)
       onAdjusted()
       onOpenChange(false)
     } catch (err) {
@@ -105,7 +106,7 @@ export function AdjustStockDialog({
             </Button>
           </DialogTitle>
           <DialogDescription>
-            {product.name} · {product.sku} · currently <strong>{product.stock}</strong> on hand
+            {product.name} · {product.sku} · currently <strong>{formatQty(product.stock, product.unit)}</strong> on hand
           </DialogDescription>
         </DialogHeader>
 
@@ -129,7 +130,7 @@ export function AdjustStockDialog({
                     <p className="truncate text-muted-foreground">{m.reason}</p>
                   </div>
                   <div className="shrink-0 text-right text-muted-foreground">
-                    <p className="tabular-nums">→ {m.stockAfter}</p>
+                    <p className="tabular-nums">→ {formatQty(m.stockAfter, product.unit)}</p>
                     <p>{formatDateTime(m.createdAt)}</p>
                   </div>
                 </div>

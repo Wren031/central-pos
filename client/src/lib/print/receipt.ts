@@ -1,5 +1,6 @@
 import { EscPos, PAPER_COLS, type PaperWidth } from './escpos'
 import { formatDateTime } from '../format'
+import { unitLabel } from '../units'
 import {
   DEFAULT_RECEIPT_LAYOUT,
   receiptFontStep,
@@ -72,9 +73,10 @@ export function buildReceipt(order: Order, opts: ReceiptOptions): Uint8Array {
   p.text('Item                           Qty    Amount'.slice(0, cols))
   for (const item of order.items) {
     const name = item.name.length > maxName ? `${item.name.slice(0, maxName - 1)}?` : item.name
+    const qtyText = `${item.qty} ${unitLabel(item.unit)}`
     const qty = layout.showUnitPrice
-      ? `${item.qty} x ${item.price.toFixed(2)}`
-      : String(item.qty)
+      ? `${qtyText} x ${item.price.toFixed(2)}`
+      : qtyText
     p.row(`${name} ${qty}`, (item.price * item.qty).toFixed(2), cols)
   }
   p.dashLine(cols)

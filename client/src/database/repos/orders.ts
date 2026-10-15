@@ -125,6 +125,7 @@ export async function createOrder(input: {
           name: it.name,
           price: it.price,
           qty: it.qty,
+          unit: it.unit,
         }))
         await db.orderItems.bulkPut(itemRecords)
 

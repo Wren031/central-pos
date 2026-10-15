@@ -22,6 +22,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { peso } from '@/lib/format'
 import { addCustomer, createOrder, getCustomers, InsufficientStockError, subscribeDb } from '@/lib/repos'
+import { formatQty, unitLabel } from '@/lib/units'
 import { printerService } from '@/database/repos/printer'
 import { cn } from '@/lib/utils'
 import type { Customer, Order } from '@/lib/types'
@@ -262,7 +263,7 @@ export function CheckoutDialog({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{it.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {peso(it.price)} each · max {it.maxStock}
+                        {peso(it.price)} per {unitLabel(it.unit)} · max {formatQty(it.maxStock, it.unit)}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">

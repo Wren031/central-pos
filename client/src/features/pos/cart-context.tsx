@@ -33,6 +33,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           name: product.name,
           price: product.price,
           qty: 1,
+          unit: product.unit,
           maxStock: product.stock,
         },
       ]

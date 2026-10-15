@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/empty-state'
 import { formatDateTime, peso } from '@/lib/format'
 import { productImage } from '@/lib/mock-image'
+import { formatQty, unitLabel } from '@/lib/units'
 import { getPosType } from '@/lib/pos-types'
 import { getCategories, getOrders, getProducts } from '@/lib/repos'
 import { cn } from '@/lib/utils'
@@ -48,7 +49,7 @@ function CartLines() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{it.name}</p>
             <p className="text-xs text-muted-foreground tabular-nums">
-              {peso(it.price)} × {it.qty} = {peso(it.price * it.qty)}
+              {peso(it.price)} × {formatQty(it.qty, it.unit)} = {peso(it.price * it.qty)}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -247,7 +248,7 @@ export function CatalogPage() {
 
       <div className="flex min-h-0 flex-1 gap-6">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="-mx-1 mb-4 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-1">
+          <div className="mb-4 flex shrink-0 flex-wrap gap-1.5 pb-1">
             {categories.map((c) => (
               <button
                 key={c}
@@ -320,14 +321,19 @@ export function CatalogPage() {
                         {!out && p.stock <= 10 && (
                           <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                             <AlertTriangle className="size-3" aria-hidden />
-                            {p.stock} left
+                            {formatQty(p.stock, p.unit)} left
                           </span>
                         )}
                       </div>
                       <div className="p-3.5">
                         <p className="line-clamp-1 text-[15px] font-medium">{p.name}</p>
                         <div className="mt-1.5 flex items-center justify-between">
-                          <span className="text-base font-semibold tabular-nums">{peso(p.price)}</span>
+                          <span className="text-base font-semibold tabular-nums">
+                            {peso(p.price)}
+                            <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+                              /{unitLabel(p.unit)}
+                            </span>
+                          </span>
                           <Badge variant="secondary" className="text-[11px]">
                             {p.category}
                           </Badge>

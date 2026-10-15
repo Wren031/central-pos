@@ -1,10 +1,18 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarRange, Download, Loader2, TrendingUp, Wallet } from 'lucide-react'
+import { CalendarRange, ChevronDown, Download, FileText, Loader2, Printer, TrendingUp, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -29,6 +37,8 @@ import { useAuth } from '@/state/auth-context'
 import {
   buildSalesReportCsv,
   downloadSalesReport,
+  downloadSalesReportWord,
+  printSalesReport,
   type SalesReportData,
 } from '@/services/report-export-service'
 import { DateRangeSelect } from './date-range-select'
@@ -134,15 +144,41 @@ export function ReportsPage() {
     )
   }
 
-  function handleExport() {
+  function handleExportCsv() {
     if (!data || !store) return
     setExporting(true)
     try {
       const csv = buildSalesReportCsv(data, range, store)
       downloadSalesReport(csv, range)
-      toast.success('Report exported')
+      toast.success('Report exported as CSV')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function handleExportWord() {
+    if (!data || !store) return
+    setExporting(true)
+    try {
+      downloadSalesReportWord(data, range, store)
+      toast.success('Report exported as Word (.doc)')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function handleExportPdf() {
+    if (!data || !store) return
+    setExporting(true)
+    try {
+      printSalesReport(data, range, store)
+      toast.info('Choose “Save as PDF” in the print dialog.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not open the print dialog.')
     } finally {
       setExporting(false)
     }
@@ -161,14 +197,32 @@ export function ReportsPage() {
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <DateRangeSelect value={range} onChange={setRange} className="sm:w-44" />
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            disabled={loading || !data || exporting}
-          >
-            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={loading || !data || exporting}
+                aria-label="Export report"
+              >
+                {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Export
+                <ChevronDown className="size-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Export as</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleExportCsv}>
+                <FileText className="size-4" /> CSV (.csv)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportPdf}>
+                <Printer className="size-4" /> PDF (Save as PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportWord}>
+                <FileText className="size-4" /> Word (.doc)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

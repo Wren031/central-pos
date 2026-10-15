@@ -2,7 +2,6 @@ import { db } from '../schema'
 import { refreshCacheForUser } from '../db'
 import { getCache, resetCache } from '../cache'
 import { hashPassword, isPbkdf2Hash, legacyEncode, verifyPassword } from '../auth-hash'
-import { PLAN_PRICES, PLAN_DAYS } from '@/lib/plan-constants'
 import { mockClock } from '@/lib/mock-clock'
 import { latency, newId, nowIso, syncOpFor, putSyncOp } from './helpers'
 import { getPosTypeCategories } from './pos-catalog'
@@ -356,4 +355,3 @@ export async function changePosType(userId: string, posType: PosTypeId): Promise
 }
 
 export type { NotificationPrefs, Subscription }
-export { PLAN_PRICES, PLAN_DAYS }

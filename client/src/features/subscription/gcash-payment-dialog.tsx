@@ -2,13 +2,16 @@ import * as React from 'react'
 import {
   BadgeCheck,
   Clock,
+  Download,
   ImagePlus,
   Info,
   Loader2,
   Maximize2,
   QrCode,
+  RefreshCw,
   Smartphone,
   Trash2,
+  WifiOff,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -26,16 +29,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { PLAN_DAYS, PLAN_LABELS, PLAN_PRICES } from '@/lib/repos'
-import { GCASH_QR_URL } from '@/lib/gcash-qr'
 import { peso } from '@/lib/format'
-import { submitPaymentRequest } from '@/lib/repos'
-import type { PaymentRequest, PlanId } from '@/lib/types'
+import { cn } from '@/lib/utils'
+import { useOnlineStatus } from '@/hooks/use-online-status'
+import { submitGcashPayment } from '@/services/subscription-payment-service'
+import type { PaymentRequest, PlanRecord } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
+import { useSubscription } from '@/state/subscription-context'
 
 type Step = 'review' | 'pay' | 'submitted'
 
-/** Downscales and re-encodes a receipt image so it stays a small local blob. */
+/** Downscales and re-encodes a receipt image so it stays a small upload. */
 function fileToReceiptDataUrl(file: File, maxSize = 1000): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -68,14 +72,105 @@ function fileToReceiptDataUrl(file: File, maxSize = 1000): Promise<string> {
   })
 }
 
-function GcashQrPanel({ onEnlarge }: { onEnlarge: () => void }) {
+/** `gcash-qr-<plan>.png`, falling back to `gcash-qr.png` when unnamed. */
+function qrFileName(planName: string | null): string {
+  const slug = (planName ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug ? `gcash-qr-${slug}.png` : 'gcash-qr.png'
+}
+
+/**
+ * Saves the QR image to the device. A plain `<a download>` cannot save a
+ * cross-origin image (the Supabase `payment-assets` bucket or an external URL),
+ * so fetch it into a blob first. If the source blocks CORS, fall back to
+ * opening it in a new tab for a manual save.
+ */
+async function downloadQrImage(url: string, fileName: string): Promise<void> {
+  let blob: Blob
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (!res.ok) throw new Error(`The QR image could not be downloaded (HTTP ${res.status}).`)
+    blob = await res.blob()
+  } catch (err) {
+    // A cross-origin image without CORS headers rejects with a TypeError; open it
+    // in a new tab so the customer can still save it manually.
+    if (err instanceof TypeError) {
+      window.open(url, '_blank', 'noopener')
+      throw new Error('Opened the QR in a new tab — long-press or right-click to save it.')
+    }
+    throw err instanceof Error ? err : new Error('Could not download the QR code.')
+  }
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+function GcashQrPanel({
+  url,
+  fileName,
+  error,
+  onEnlarge,
+  onRetry,
+}: {
+  url: string | null
+  fileName: string
+  error: string | null
+  onEnlarge: () => void
+  onRetry: () => Promise<void> | void
+}) {
   const [failed, setFailed] = React.useState(false)
+  const [downloading, setDownloading] = React.useState(false)
+  const [retrying, setRetrying] = React.useState(false)
 
   React.useEffect(() => {
     setFailed(false)
-  }, [])
+  }, [url])
 
-  if (!GCASH_QR_URL || failed) {
+  async function download() {
+    if (!url || downloading) return
+    setDownloading(true)
+    try {
+      await downloadQrImage(url, fileName)
+      toast.success('QR code downloaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not download the QR code.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  async function retry() {
+    if (retrying) return
+    setRetrying(true)
+    try {
+      await onRetry()
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  // The QR image could not be fetched, or none is published. A backend error is
+  // surfaced distinctly from a genuinely unconfigured QR so a missing/mis-
+  // deployed service doesn't masquerade as "not set up yet".
+  if (!url || failed) {
+    if (error) {
+      return (
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-6 text-center">
+          <WifiOff className="size-8 text-amber-600" aria-hidden />
+          <p className="text-sm font-medium text-amber-800">GCash QR service unavailable</p>
+          <p className="max-w-sm text-xs text-amber-700">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void retry()} disabled={retrying}>
+            <RefreshCw className={cn('size-3.5', retrying && 'animate-spin')} />
+            Try again
+          </Button>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed bg-muted/30 p-6 text-center">
         <QrCode className="size-8 text-muted-foreground" aria-hidden />
@@ -93,19 +188,25 @@ function GcashQrPanel({ onEnlarge }: { onEnlarge: () => void }) {
     <div className="space-y-2">
       <div className="relative mx-auto w-fit rounded-xl border bg-white p-3">
         <img
-          src={GCASH_QR_URL}
+          src={url}
           alt="GCash payment QR code"
           className="h-56 w-56 object-contain"
           onError={() => setFailed(true)}
         />
-        <button
-          type="button"
-          onClick={onEnlarge}
-          className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border bg-background/90 px-2 py-1 text-[11px] font-medium shadow-sm hover:bg-background"
-        >
-          <Maximize2 className="size-3" />
+      </div>
+      <div className="flex items-center justify-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => void download()} disabled={downloading}>
+          {downloading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          Download QR
+        </Button>
+        <Button variant="outline" size="sm" onClick={onEnlarge}>
+          <Maximize2 className="size-3.5" />
           Enlarge
-        </button>
+        </Button>
       </div>
       <p className="text-center text-xs text-muted-foreground">
         Open the GCash app → Scan QR → pay the exact amount, then keep the reference number.
@@ -118,14 +219,20 @@ export function GcashPaymentDialog({
   open,
   onOpenChange,
   plan,
+  gcashQrUrl,
+  gcashQrError,
   currentExpiry,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  plan: Exclude<PlanId, 'trial'> | null
+  plan: PlanRecord | null
+  gcashQrUrl: string | null
+  gcashQrError: string | null
   currentExpiry: string | null
 }) {
   const { user } = useAuth()
+  const { refreshRemote } = useSubscription()
+  const online = useOnlineStatus()
   const [step, setStep] = React.useState<Step>('review')
   const [reference, setReference] = React.useState('')
   const [notes, setNotes] = React.useState('')
@@ -133,6 +240,7 @@ export function GcashPaymentDialog({
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [enlarged, setEnlarged] = React.useState(false)
+  const [downloadingQr, setDownloadingQr] = React.useState(false)
   const [submitted, setSubmitted] = React.useState<PaymentRequest | null>(null)
 
   React.useEffect(() => {
@@ -144,15 +252,16 @@ export function GcashPaymentDialog({
       setError(null)
       setBusy(false)
       setEnlarged(false)
+      setDownloadingQr(false)
       setSubmitted(null)
     }
   }, [open, plan])
 
   if (!plan) return null
 
-  const selectedPlan: Exclude<PlanId, 'trial'> = plan
-  const price = PLAN_PRICES[selectedPlan]
-  const days = PLAN_DAYS[selectedPlan]
+  const price = plan.price
+  const days = plan.durationDays
+  const planName = plan.name
 
   async function attachProof(file: File | null) {
     if (!file) return
@@ -165,7 +274,7 @@ export function GcashPaymentDialog({
   }
 
   async function submit() {
-    if (!user) return
+    if (!user || !plan) return
     setError(null)
     if (reference.trim().length < 4) {
       setError('Enter the GCash transaction reference number.')
@@ -173,9 +282,12 @@ export function GcashPaymentDialog({
     }
     setBusy(true)
     try {
-      const request = await submitPaymentRequest({
+      const request = await submitGcashPayment({
         userId: user.id,
-        plan: selectedPlan,
+        email: user.email,
+        fullName: user.fullName,
+        businessName: user.businessName,
+        plan,
         referenceNo: reference,
         notes,
         proofImage,
@@ -183,10 +295,24 @@ export function GcashPaymentDialog({
       setSubmitted(request)
       setStep('submitted')
       toast.success('Payment submitted — awaiting verification.')
+      void refreshRemote()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your payment.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function downloadEnlargedQr() {
+    if (!gcashQrUrl || downloadingQr) return
+    setDownloadingQr(true)
+    try {
+      await downloadQrImage(gcashQrUrl, qrFileName(planName))
+      toast.success('QR code downloaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not download the QR code.')
+    } finally {
+      setDownloadingQr(false)
     }
   }
 
@@ -197,7 +323,7 @@ export function GcashPaymentDialog({
           {step === 'review' && (
             <>
               <DialogHeader>
-                <DialogTitle>Pay for the {PLAN_LABELS[plan]} plan</DialogTitle>
+                <DialogTitle>Pay for the {planName} plan</DialogTitle>
                 <DialogDescription>
                   Manual GCash payment. Your plan is activated only after an administrator verifies
                   your payment.
@@ -207,7 +333,7 @@ export function GcashPaymentDialog({
                 <div className="rounded-lg border bg-muted/40 p-4 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Plan</span>
-                    <span className="font-medium">{PLAN_LABELS[plan]}</span>
+                    <span className="font-medium">{planName}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-muted-foreground">Duration</span>
@@ -237,7 +363,7 @@ export function GcashPaymentDialog({
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setStep('pay')}>
+                <Button onClick={() => setStep('pay')} disabled={!online}>
                   <QrCode className="size-4" />
                   Continue to GCash payment
                 </Button>
@@ -250,12 +376,25 @@ export function GcashPaymentDialog({
               <DialogHeader>
                 <DialogTitle>Scan &amp; pay with GCash</DialogTitle>
                 <DialogDescription>
-                  Pay {peso(price)} for the {PLAN_LABELS[plan]} plan, then submit your proof below.
+                  Pay {peso(price)} for the {planName} plan, then submit your proof below.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-                <GcashQrPanel onEnlarge={() => setEnlarged(true)} />
+                {!online && (
+                  <p className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+                    <WifiOff className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                    You must be online to submit your payment for verification.
+                  </p>
+                )}
+
+                <GcashQrPanel
+                  url={gcashQrUrl}
+                  fileName={qrFileName(planName)}
+                  error={gcashQrError}
+                  onEnlarge={() => setEnlarged(true)}
+                  onRetry={() => refreshRemote()}
+                />
 
                 <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
                   <ol className="list-decimal space-y-1 pl-4">
@@ -305,7 +444,7 @@ export function GcashPaymentDialog({
                       <div className="flex-1">
                         <p className="text-sm font-medium">Receipt attached</p>
                         <p className="text-xs text-muted-foreground">
-                          Stored locally and included in your submission.
+                          Uploaded with your submission for the administrator to review.
                         </p>
                       </div>
                       <Button
@@ -324,7 +463,7 @@ export function GcashPaymentDialog({
                       Attach a screenshot of your GCash confirmation
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/webp"
                         className="sr-only"
                         onChange={(e) => void attachProof(e.target.files?.[0] ?? null)}
                       />
@@ -343,7 +482,7 @@ export function GcashPaymentDialog({
                 <Button variant="outline" onClick={() => setStep('review')} disabled={busy}>
                   Back
                 </Button>
-                <Button onClick={submit} disabled={busy}>
+                <Button onClick={submit} disabled={busy || !online}>
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
                   Submit payment for verification
                 </Button>
@@ -360,7 +499,7 @@ export function GcashPaymentDialog({
                 <DialogTitle>Payment submitted</DialogTitle>
                 <DialogDescription>
                   Your GCash payment is now <strong>pending verification</strong>. An administrator
-                  will review your proof and approve or reject it. Your {PLAN_LABELS[plan]} plan
+                  will review your proof and approve or reject it. Your {planName} plan
                   activates only after approval.
                 </DialogDescription>
                 {submitted && (
@@ -383,7 +522,7 @@ export function GcashPaymentDialog({
         </DialogContent>
       </Dialog>
 
-      {enlarged && GCASH_QR_URL && (
+      {enlarged && gcashQrUrl && (
         <div
           className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-black/80 p-6"
           role="dialog"
@@ -399,11 +538,27 @@ export function GcashPaymentDialog({
             <X className="size-5" />
           </button>
           <img
-            src={GCASH_QR_URL}
+            src={gcashQrUrl}
             alt="Enlarged GCash payment QR code"
             className="max-h-[80svh] max-w-[90vw] rounded-xl bg-white p-4 object-contain"
           />
           <p className="text-sm text-white/80">Scan this code with the GCash app</p>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-60"
+            onClick={(e) => {
+              e.stopPropagation()
+              void downloadEnlargedQr()
+            }}
+            disabled={downloadingQr}
+          >
+            {downloadingQr ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Download QR
+          </button>
         </div>
       )}
     </>

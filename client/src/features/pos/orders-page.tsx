@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/common/empty-state'
 import { formatDateTime, peso } from '@/lib/format'
 import { DATE_RANGE_DEFAULT, rangeCutoff, type DateRange } from '@/lib/date-range'
 import { mockClock } from '@/lib/mock-clock'
+import { formatQty } from '@/lib/units'
 import { getOrders, setOrderPaymentStatus } from '@/lib/repos'
 import type { Order } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
@@ -176,7 +177,7 @@ export function OrdersPage() {
                     {formatDateTime(o.createdAt)}
                   </TableCell>
                   <TableCell className="max-w-40 truncate text-sm">
-                    {o.items.map((it) => `${it.name} ×${it.qty}`).join(', ')}
+                    {o.items.map((it) => `${it.name} ×${formatQty(it.qty, it.unit)}`).join(', ')}
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{peso(o.total)}</TableCell>
                   <TableCell>
@@ -224,7 +225,7 @@ export function OrdersPage() {
                 {detail.items.map((it) => (
                   <div key={it.productId} className="flex justify-between border-b px-3 py-2 last:border-0">
                     <span>
-                      {it.name} <span className="text-muted-foreground">× {it.qty}</span>
+                      {it.name} <span className="text-muted-foreground">× {formatQty(it.qty, it.unit)}</span>
                     </span>
                     <span className="tabular-nums">{peso(it.price * it.qty)}</span>
                   </div>

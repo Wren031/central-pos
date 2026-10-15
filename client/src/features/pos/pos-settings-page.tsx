@@ -21,7 +21,7 @@ import { PageHeader } from '@/components/common/page-header'
 import { StatCard } from '@/components/common/stat-card'
 import { formatDate } from '@/lib/format'
 import { getPosType } from '@/lib/pos-types'
-import { PLAN_LABELS } from '@/lib/repos'
+import { planDisplayName } from '@/lib/plan-display'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 import { DataSyncCard } from './data-sync-card'
@@ -68,7 +68,7 @@ export function PosSettingsPage() {
         <StatCard
           icon={CreditCard}
           label="Subscription"
-          value={PLAN_LABELS[sub?.plan ?? 'trial']}
+          value={planDisplayName(sub)}
           hint={state.canSell ? `${state.daysLeft} days remaining` : 'Access expired'}
         />
         <StatCard

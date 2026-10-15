@@ -66,6 +66,9 @@ order**:
    GCash payment requests and email-verification support
 8. `supabase/09_pos_type_public_read.sql` — lets the session-less POS client
    read active POS types + their categories (writes stay admin-only)
+9. `supabase/10_client_subscription_access.sql` — lets the session-less POS
+   client read the active GCash QR, submit manual payment proofs (always
+   pending), and check its own submission status
 
 The scripts are idempotent — safe to re-run after a partial failure.
 
@@ -143,7 +146,8 @@ Demo customer logins (created by the seed): `juan@bbqhouse.ph` /
 |---|---|
 | Authentication | Supabase Auth (email/password), session persisted by supabase-js |
 | Authorization | RLS policies on every table; `is_admin()` security-definer helper checks `profiles.role` |
-| Mutations | Admin actions go through SECURITY DEFINER RPCs (`admin_set_user_status`, `admin_extend_subscription`, `admin_change_plan`, `admin_cancel_subscription`, `admin_record_mock_payment`) that re-check admin rights and write audit rows atomically |
+| Mutations | Admin actions go through SECURITY DEFINER RPCs (`admin_set_user_status`, `admin_extend_subscription`, `admin_change_plan`, `admin_cancel_subscription`, `admin_record_mock_payment`, `admin_delete_plan`) that re-check admin rights and write audit rows atomically |
+| Client-facing RPCs | The session-less POS client calls `public_gcash_qr()`, `submit_payment_request()`, and `client_payment_requests()` (anon-executable SECURITY DEFINER). Submission always writes `status='pending'` with `user_id=null`; only an admin approval activates a plan |
 | Audit | DB triggers on `profiles`, `stores`, `subscriptions`, `payments`, `pos_types`, `subscription_plans`, `system_settings` + explicit RPC logging. `activity_logs` is append-only (no update/delete policies) |
 | Role escalation | `profiles_protect` trigger blocks role/email/status changes except by admins; `promote_to_admin()` is the only path to admin |
 
@@ -156,16 +160,31 @@ Demo customer logins (created by the seed): `juan@bbqhouse.ph` /
   local Dexie model so future device sync stays trivial). Renewal history
   lives in `payments`.
 - `subscription_plans` — editable in Settings (`trial` 30d ₱0, `weekly` 7d
-  ₱99, `monthly` 30d ₱299, `yearly` 365d ₱2,999 by default).
+  ₱99, `monthly` 30d ₱299, `yearly` 365d ₱2,999 by default). Plans can be
+  created/edited/activated/deactivated at any time; deleting a plan is blocked
+  while any subscription, payment, or request references it
+  (`admin_delete_plan` — deactivate instead).
+- `system_settings.gcash_qr` — `{"url","active"}`; the POS client reads only the
+  active QR via `public_gcash_qr()`.
 - `payments` — mock only; `reference` is the transaction id.
 - `pos_sales` — forward-compatible table for offline POS sale sync: a device
   queues sales offline and pushes them here on reconnect with a unique
   `idempotency_key` (retries can never double-count). RLS allows a device to
   insert/read only its own store's sales.
 
-### Future POS ↔ Supabase integration (not implemented yet)
+### POS ↔ Supabase integration
 
-The `client/` app is intentionally untouched. When you migrate it:
+The `client/` app is offline-first (Dexie/IndexedDB) and holds **no** Supabase
+session. These pieces are now wired to Supabase:
+
+- **Plans** — read live from `subscription_plans` (active rows) and cached
+  locally; no plan data is hardcoded on the client.
+- **GCash QR** — read from `public_gcash_qr()` (active only).
+- **Manual payments** — `submit_payment_request()` (online-only, always
+  pending); `client_payment_requests()` mirrors admin approval/rejection back so
+  the local subscription activates only after approval.
+
+Still planned:
 
 1. Replace local auth with `supabase.auth` (profiles already auto-create).
 2. On app start and on reconnect, call
@@ -173,7 +192,7 @@ The `client/` app is intentionally untouched. When you migrate it:
 3. Push queued offline sales with
    `supabase.from('pos_sales').upsert(..., { onConflict: 'idempotency_key' })`.
 4. Keep the local Dexie store as the offline cache; treat Supabase as the
-   source of truth for users, stores, subscriptions, and sales.
+   source of truth for users, stores, and sales.
 
 `verify_subscription()` only lets a signed-in device verify **its own** user
 (or an admin verify anyone), and subscription rows have **no** client-writable

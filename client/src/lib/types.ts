@@ -4,7 +4,13 @@
  */
 export type PosTypeId = string
 
-export type PlanId = 'trial' | 'weekly' | 'monthly' | 'yearly'
+/**
+ * Subscription plan id — the Supabase `subscription_plans.id` text key, managed
+ * in the admin dashboard. NOT a fixed enum: admins can add or rename plans at
+ * any time, so this is intentionally an opaque string ('trial' is the seeded
+ * trial plan id).
+ */
+export type PlanId = string
 
 export interface NotificationPrefs {
   expiration: boolean
@@ -37,6 +43,10 @@ export interface Subscription {
   id: string
   userId: string
   plan: PlanId
+  /** Plan name snapshot at activation — lets custom admin plans render offline. */
+  planName?: string
+  /** Plan duration snapshot (days) at activation. */
+  durationDays?: number
   startedAt: string
   expiresAt: string
   pricePaid: number
@@ -69,17 +79,56 @@ export type PaymentRequestStatus = 'pending' | 'approved' | 'rejected'
 export interface PaymentRequest {
   id: string
   userId: string
-  plan: Exclude<PlanId, 'trial'>
+  plan: PlanId
+  /** Plan name snapshot for display when the catalogue is offline. */
+  planName?: string
   amount: number
   /** Customer-entered GCash transaction reference number. */
   referenceNo: string
   notes: string
   /** Compressed data URL of the uploaded receipt screenshot, if any. */
   proofImage: string | null
+  /** Storage path of the uploaded receipt in the private payment-proofs bucket. */
+  proofPath?: string | null
+  /** Server row id once the submission has reached Supabase. */
+  remoteId?: string | null
   status: PaymentRequestStatus
   rejectionReason: string | null
   createdAt: string
   reviewedAt: string | null
+}
+
+/**
+ * An admin-managed subscription plan cached from Supabase
+ * (`subscription_plans`, active rows only). The POS client never hardcodes
+ * plan names, prices, or durations — it reads them here.
+ */
+export interface PlanRecord {
+  id: string
+  name: string
+  description: string
+  durationDays: number
+  price: number
+  currency: string
+  isTrial: boolean
+  active: boolean
+  features: string[]
+  sortOrder: number
+  fetchedAt: string
+}
+
+/** The ACTIVE GCash QR shown on the subscription payment page. */
+export interface GcashQrConfig {
+  /** Public image URL, or null when no active QR is configured. */
+  url: string | null
+  active: boolean
+  fetchedAt: string | null
+  /**
+   * Set when the QR could not be loaded because the backend is unavailable
+   * (e.g. the `public_gcash_qr()` RPC was never deployed) — distinct from a
+   * genuinely unconfigured QR, which leaves this null.
+   */
+  error?: string | null
 }
 
 export interface Product {
@@ -90,6 +139,8 @@ export interface Product {
   category: string
   price: number
   stock: number
+  /** Unit of measure label (pc, bottle, kg…) — display only. Defaults to 'pc'. */
+  unit?: string
   emoji: string
   image?: string
   active: boolean
@@ -101,6 +152,8 @@ export interface OrderItem {
   name: string
   price: number
   qty: number
+  /** Unit label snapshot taken at sale time, so old orders keep their unit. */
+  unit?: string
 }
 
 export interface Order {
@@ -197,6 +250,8 @@ export interface OrderItemRecord {
   name: string
   price: number
   qty: number
+  /** Unit label snapshot taken at sale time. */
+  unit?: string
 }
 
 export type SyncEntity =
