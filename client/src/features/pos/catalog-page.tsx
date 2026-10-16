@@ -409,15 +409,7 @@ export function CatalogPage() {
         </Sheet>
       </div>
 
-      <CheckoutDialog
-        open={checkoutOpen}
-        onOpenChange={setCheckoutOpen}
-        onOrderCreated={() => {
-          // No receipt pop-up after a sale — the receipt prints automatically
-          // over Bluetooth (see CheckoutDialog.submit) when auto-print is on.
-          setCheckoutOpen(false)
-        }}
-      />
+      <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} />
 
       <ReceiptDialog
         order={lastOrder}

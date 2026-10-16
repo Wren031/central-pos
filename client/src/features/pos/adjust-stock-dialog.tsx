@@ -4,6 +4,8 @@ import {
   ArrowUp,
   History,
   Loader2,
+  Maximize2,
+  Minimize2,
   PackagePlus,
   ShoppingCart,
   Sparkles,
@@ -70,6 +72,7 @@ export function AdjustStockDialog({
   const [reason, setReason] = React.useState('')
   const [saving, setSaving] = React.useState(false)
   const [tab, setTab] = React.useState<'adjust' | 'history'>('adjust')
+  const [expanded, setExpanded] = React.useState(false)
   const [movements, setMovements] = React.useState<StockMovement[]>([])
 
   const loadHistory = React.useCallback(() => {
@@ -84,6 +87,7 @@ export function AdjustStockDialog({
       setReason('')
       setSaving(false)
       setTab('adjust')
+      setExpanded(false)
       loadHistory()
     }
   }, [product, loadHistory])
@@ -117,7 +121,9 @@ export function AdjustStockDialog({
 
   return (
     <Dialog open={!!product} onOpenChange={(o) => !saving && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className={cn('transition-[max-width]', expanded && tab === 'history' ? 'sm:max-w-2xl' : 'sm:max-w-md')}
+      >
         <DialogHeader className="pr-8">
           <DialogTitle>Adjust stock</DialogTitle>
           <DialogDescription>
@@ -204,49 +210,78 @@ export function AdjustStockDialog({
                 </p>
               </div>
             ) : (
-              <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
-                {movements.map((m) => {
-                  const meta = MOVEMENT_META[m.type] ?? MOVEMENT_META.adjust
-                  const Icon = meta.icon
-                  return (
-                    <li
-                      key={m.id}
-                      className="flex items-start gap-3 rounded-lg border bg-card px-3 py-2.5"
-                    >
-                      <span
-                        className={cn(
-                          'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted/40',
-                          meta.tone
-                        )}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    {movements.length} movement{movements.length === 1 ? '' : 's'}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground"
+                    onClick={() => setExpanded((e) => !e)}
+                    aria-label={expanded ? 'Collapse stock history' : 'Expand stock history'}
+                    aria-pressed={expanded}
+                    title={expanded ? 'Collapse' : 'Maximize'}
+                  >
+                    {expanded ? (
+                      <Minimize2 className="size-3.5" />
+                    ) : (
+                      <Maximize2 className="size-3.5" />
+                    )}
+                  </Button>
+                </div>
+                <ul
+                  className={cn(
+                    'overflow-y-auto pr-0.5',
+                    expanded
+                      ? 'grid max-h-[60vh] gap-1.5 sm:grid-cols-2'
+                      : 'max-h-72 space-y-1.5'
+                  )}
+                >
+                  {movements.map((m) => {
+                    const meta = MOVEMENT_META[m.type] ?? MOVEMENT_META.adjust
+                    const Icon = meta.icon
+                    return (
+                      <li
+                        key={m.id}
+                        className="flex items-start gap-3 rounded-lg border bg-card px-3 py-2.5"
                       >
-                        <Icon className="size-3.5" aria-hidden />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-medium">{meta.label}</p>
-                          <span
-                            className={cn(
-                              'shrink-0 text-sm font-semibold tabular-nums',
-                              m.qtyDelta >= 0 ? 'text-emerald-600' : 'text-destructive'
-                            )}
-                          >
-                            {m.qtyDelta > 0 ? `+${m.qtyDelta}` : m.qtyDelta}
-                          </span>
+                        <span
+                          className={cn(
+                            'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted/40',
+                            meta.tone
+                          )}
+                        >
+                          <Icon className="size-3.5" aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-medium">{meta.label}</p>
+                            <span
+                              className={cn(
+                                'shrink-0 text-sm font-semibold tabular-nums',
+                                m.qtyDelta >= 0 ? 'text-emerald-600' : 'text-destructive'
+                              )}
+                            >
+                              {m.qtyDelta > 0 ? `+${m.qtyDelta}` : m.qtyDelta}
+                            </span>
+                          </div>
+                          {m.reason && (
+                            <p className="truncate text-xs text-muted-foreground">{m.reason}</p>
+                          )}
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            <span className="tabular-nums">
+                              → {formatQty(m.stockAfter, product.unit)}
+                            </span>{' '}
+                            · {relativeFromNow(m.createdAt)} · {formatDateTime(m.createdAt)}
+                          </p>
                         </div>
-                        {m.reason && (
-                          <p className="truncate text-xs text-muted-foreground">{m.reason}</p>
-                        )}
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          <span className="tabular-nums">
-                            → {formatQty(m.stockAfter, product.unit)}
-                          </span>{' '}
-                          · {relativeFromNow(m.createdAt)} · {formatDateTime(m.createdAt)}
-                        </p>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
             )}
           </TabsContent>
         </Tabs>

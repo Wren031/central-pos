@@ -223,9 +223,13 @@ export const printerService = {
   /**
    * Print an order receipt. Returns true only if the hardware accepted the job.
    * Callers must surface failures — never assume success.
+   *
+   * Prints whenever a printer is connected; the auto-print preference is gated
+   * at the auto-print call site, so a manual "Print receipt" action (reprint)
+   * works even when auto-print is off.
    */
   async printOrder(order: Order, store: Store): Promise<boolean> {
-    if (!state.connected || !state.autoPrint) return false
+    if (!state.connected) return false
     if (state.printing) return false
     patch({ printing: true })
     try {

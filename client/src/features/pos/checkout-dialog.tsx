@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Banknote, Check, ChevronDown, CreditCard, Loader2, Minus, Plus, Trash2, UserPlus } from 'lucide-react'
+import { Banknote, Check, ChevronDown, CreditCard, Loader2, Minus, Plus, Printer, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -146,11 +146,9 @@ function CustomerPicker({
 export function CheckoutDialog({
   open,
   onOpenChange,
-  onOrderCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onOrderCreated: (order: Order) => void
 }) {
   const { user, store } = useAuth()
   const { items, subtotal, increment, decrement, remove, clear } = useCart()
@@ -158,6 +156,8 @@ export function CheckoutDialog({
   const [paid, setPaid] = React.useState(true)
   const [cash, setCash] = React.useState('')
   const [processing, setProcessing] = React.useState(false)
+  const [completedOrder, setCompletedOrder] = React.useState<Order | null>(null)
+  const [printing, setPrinting] = React.useState(false)
   const [customer, setCustomer] = React.useState<{ id: string | null; name: string }>({
     id: null,
     name: 'Walk-in',
@@ -169,6 +169,8 @@ export function CheckoutDialog({
       setPaid(true)
       setCash('')
       setProcessing(false)
+      setCompletedOrder(null)
+      setPrinting(false)
       setCustomer({ id: null, name: 'Walk-in' })
     }
   }, [open])
@@ -197,9 +199,13 @@ export function CheckoutDialog({
         cashTendered: paid && cashNum > 0 ? cashNum : null,
         change: paid && cashNum > 0 ? change : null,
       })
-      clear()
-      onOrderCreated(order)
       toast.success(`Order ${order.receiptNo} created`)
+
+      // Same dialog, only the footer buttons change: the cashier now sees
+      // "Print receipt" / "Complete order" instead of "Complete sale". The cart
+      // is cleared when the sale is finished (see handleOpenChange).
+      setCompletedOrder(order)
+      setProcessing(false)
 
       // Auto-print over Bluetooth when enabled and a printer is really connected.
       // Fire-and-forget: the toast below reports the hardware result, never a fake success.
@@ -232,8 +238,44 @@ export function CheckoutDialog({
     }
   }
 
+  /** Manual reprint. Honest about missing hardware. */
+  async function printReceipt() {
+    if (!completedOrder || !store) return
+    if (!printerService.getState().connected) {
+      toast.info('No printer connected', {
+        description: 'Connect a Bluetooth printer in POS settings to print receipts.',
+      })
+      return
+    }
+    setPrinting(true)
+    try {
+      const printed = await printerService.printOrder(completedOrder, store)
+      if (printed) {
+        toast.success('Receipt sent to printer')
+        // Printing finished — close the sale out automatically.
+        handleOpenChange(false)
+      } else {
+        toast.error(printerService.getState().error ?? 'Printing failed.')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Printing failed.')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
+  /**
+   * Single close path. When a sale has just been completed, finishing (or
+   * dismissing) also clears the cart so the next sale starts empty.
+   */
+  function handleOpenChange(next: boolean) {
+    if (processing) return
+    if (!next && completedOrder) clear()
+    onOpenChange(next)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !processing && onOpenChange(o)}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="flex max-h-[90svh] flex-col gap-3 sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Checkout</DialogTitle>
@@ -381,13 +423,31 @@ export function CheckoutDialog({
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={processing}>
-                Cancel
-              </Button>
-              <Button onClick={submit} disabled={!canSubmit}>
-                {processing ? <Loader2 className="size-4 animate-spin" /> : null}
-                Complete sale · {peso(total)}
-              </Button>
+              {completedOrder ? (
+                <>
+                  <Button onClick={() => handleOpenChange(false)}>
+                    <Check className="size-4" />
+                    Complete order
+                  </Button>
+                  <Button variant="outline" onClick={() => void printReceipt()} disabled={printing}>
+                    {printing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Printer className="size-4" />
+                    )}
+                    Print receipt
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={submit} disabled={!canSubmit}>
+                    Complete sale · {peso(total)}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </>
         )}
