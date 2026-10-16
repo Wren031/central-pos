@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { ArrowDown, ArrowUp, History, Loader2, PackagePlus, Wrench } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  History,
+  Loader2,
+  PackagePlus,
+  ShoppingCart,
+  Sparkles,
+  Wrench,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,7 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatDateTime } from '@/lib/format'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { formatDateTime, relativeFromNow } from '@/lib/format'
 import { adjustStock, getProductMovements, subscribeDb } from '@/lib/repos'
 import { formatQty } from '@/lib/units'
 import type { Product, StockMovement, StockMovementType } from '@/lib/types'
@@ -32,6 +42,18 @@ const TYPES: { value: StockMovementType; label: string; icon: React.ElementType 
   { value: 'damage', label: 'Damage / write-off (−)', icon: ArrowDown },
   { value: 'adjust', label: 'Manual correction', icon: Wrench },
 ]
+
+/** Friendly label, icon, and tone for each kind of stock movement. */
+const MOVEMENT_META: Record<
+  StockMovementType,
+  { label: string; icon: React.ElementType; tone: string }
+> = {
+  initial: { label: 'Initial stock', icon: Sparkles, tone: 'text-muted-foreground' },
+  restock: { label: 'Restock', icon: PackagePlus, tone: 'text-emerald-600' },
+  sale: { label: 'Sale', icon: ShoppingCart, tone: 'text-muted-foreground' },
+  adjust: { label: 'Manual correction', icon: Wrench, tone: 'text-amber-600' },
+  damage: { label: 'Damage / write-off', icon: ArrowDown, tone: 'text-destructive' },
+}
 
 export function AdjustStockDialog({
   product,
@@ -47,7 +69,7 @@ export function AdjustStockDialog({
   const [qty, setQty] = React.useState('1')
   const [reason, setReason] = React.useState('')
   const [saving, setSaving] = React.useState(false)
-  const [showHistory, setShowHistory] = React.useState(false)
+  const [tab, setTab] = React.useState<'adjust' | 'history'>('adjust')
   const [movements, setMovements] = React.useState<StockMovement[]>([])
 
   const loadHistory = React.useCallback(() => {
@@ -61,7 +83,7 @@ export function AdjustStockDialog({
       setQty('1')
       setReason('')
       setSaving(false)
-      setShowHistory(false)
+      setTab('adjust')
       loadHistory()
     }
   }, [product, loadHistory])
@@ -74,6 +96,10 @@ export function AdjustStockDialog({
   const signed = type === 'restock' ? Math.abs(qtyNum) : type === 'damage' ? -Math.abs(qtyNum) : qtyNum
   const nextStock = product.stock + signed
   const canSubmit = signed !== 0 && nextStock >= 0
+
+  function close() {
+    if (!saving) onOpenChange(false)
+  }
 
   async function submit() {
     if (!product || !canSubmit) return
@@ -92,53 +118,35 @@ export function AdjustStockDialog({
   return (
     <Dialog open={!!product} onOpenChange={(o) => !saving && onOpenChange(o)}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Adjust stock
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto"
-              onClick={() => setShowHistory((h) => !h)}
-              aria-label="Toggle stock history"
-            >
-              <History className="size-4" />
-            </Button>
-          </DialogTitle>
+        <DialogHeader className="pr-8">
+          <DialogTitle>Adjust stock</DialogTitle>
           <DialogDescription>
-            {product.name} · {product.sku} · currently <strong>{formatQty(product.stock, product.unit)}</strong> on hand
+            {product.name} · {product.sku} · currently{' '}
+            <strong className="font-medium text-foreground">
+              {formatQty(product.stock, product.unit)}
+            </strong>{' '}
+            on hand
           </DialogDescription>
         </DialogHeader>
 
-        {showHistory ? (
-          <div className="max-h-72 space-y-1.5 overflow-y-auto">
-            {movements.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No stock history yet.</p>
-            ) : (
-              movements.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {m.type}{' '}
-                      <span className={cn('tabular-nums', m.qtyDelta >= 0 ? 'text-emerald-600' : 'text-destructive')}>
-                        {m.qtyDelta > 0 ? `+${m.qtyDelta}` : m.qtyDelta}
-                      </span>
-                    </p>
-                    <p className="truncate text-muted-foreground">{m.reason}</p>
-                  </div>
-                  <div className="shrink-0 text-right text-muted-foreground">
-                    <p className="tabular-nums">→ {formatQty(m.stockAfter, product.unit)}</p>
-                    <p>{formatDateTime(m.createdAt)}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'adjust' | 'history')}>
+          <TabsList className="w-full">
+            <TabsTrigger value="adjust">
+              <Wrench className="size-4" aria-hidden />
+              Adjust
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="size-4" aria-hidden />
+              History
+              {movements.length > 0 && (
+                <Badge variant="secondary" className="h-4 px-1.5 text-[10px] tabular-nums">
+                  {movements.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="adjust" className="space-y-3 pt-1">
             <div className="space-y-2">
               <Label>Adjustment type</Label>
               <Select value={type} onValueChange={(v) => setType(v as StockMovementType)}>
@@ -184,17 +192,79 @@ export function AdjustStockDialog({
                 onChange={(e) => setReason(e.target.value)}
               />
             </div>
-          </div>
-        )}
+          </TabsContent>
+
+          <TabsContent value="history" className="pt-1">
+            {movements.length === 0 ? (
+              <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed py-8 text-center">
+                <History className="size-5 text-muted-foreground" aria-hidden />
+                <p className="text-sm font-medium">No stock history yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Adjustments and sales for this product will appear here.
+                </p>
+              </div>
+            ) : (
+              <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+                {movements.map((m) => {
+                  const meta = MOVEMENT_META[m.type] ?? MOVEMENT_META.adjust
+                  const Icon = meta.icon
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex items-start gap-3 rounded-lg border bg-card px-3 py-2.5"
+                    >
+                      <span
+                        className={cn(
+                          'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted/40',
+                          meta.tone
+                        )}
+                      >
+                        <Icon className="size-3.5" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-medium">{meta.label}</p>
+                          <span
+                            className={cn(
+                              'shrink-0 text-sm font-semibold tabular-nums',
+                              m.qtyDelta >= 0 ? 'text-emerald-600' : 'text-destructive'
+                            )}
+                          >
+                            {m.qtyDelta > 0 ? `+${m.qtyDelta}` : m.qtyDelta}
+                          </span>
+                        </div>
+                        {m.reason && (
+                          <p className="truncate text-xs text-muted-foreground">{m.reason}</p>
+                        )}
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          <span className="tabular-nums">
+                            → {formatQty(m.stockAfter, product.unit)}
+                          </span>{' '}
+                          · {relativeFromNow(m.createdAt)} · {formatDateTime(m.createdAt)}
+                        </p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Close
-          </Button>
-          {!showHistory && (
-            <Button onClick={() => void submit()} disabled={!canSubmit || saving}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-              Apply adjustment
+          {tab === 'adjust' ? (
+            <>
+              <Button variant="outline" onClick={close} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={() => void submit()} disabled={!canSubmit || saving}>
+                {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                Apply adjustment
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={close}>
+              Close
             </Button>
           )}
         </DialogFooter>

@@ -10,7 +10,14 @@ import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { clearSuspendedMarker } from '@/lib/account-status'
 import { markAccountDeleted } from '@/lib/deleted-accounts'
 import { clearEphemeralSession, markEphemeralSession } from '@/lib/login-persistence'
-import type { NotificationPrefs, PendingRegistration, PosTypeId, Store, Subscription, User } from '@/lib/types'
+import type {
+  NotificationPrefs,
+  PendingRegistration,
+  PosTypeId,
+  Store,
+  Subscription,
+  User,
+} from '@/lib/types'
 
 /* ---------- users & session ---------- */
 
@@ -24,9 +31,10 @@ async function hashPasswordSafe(password: string): Promise<string> {
 }
 
 /**
- * Creates the local user + 30-day free trial + welcome notification + session.
- * Shared by direct registration and by finalizing a pending (link-confirmed)
- * registration, which already has a precomputed password hash.
+ * Creates the local user + a 30-day trial subscription + welcome notification +
+ * session. Shared by direct registration and by finalizing a pending
+ * (link-confirmed) registration, which already has a precomputed password hash.
+ * The plan duration is chosen next, on /onboarding.
  */
 async function createLocalAccount(input: {
   fullName: string
@@ -63,7 +71,7 @@ async function createLocalAccount(input: {
     userId: user.id,
     kind: 'welcome' as const,
     title: 'Welcome to UniPOS! 🎉',
-    body: 'Your 30-day free trial is now active. Choose a POS type to start selling.',
+    body: 'Finish setup to choose your workspace and plan.',
     read: false,
     createdAt: now,
   }
@@ -103,7 +111,8 @@ export async function registerUser(input: {
 
 /**
  * Stages a registration while the user confirms their email via the Supabase
- * confirmation link. The password is hashed here — no plaintext is stored.
+ * confirmation link. The password is hashed here — no plaintext is stored. The
+ * POS type and plan duration are chosen later, on /onboarding.
  */
 export async function stagePendingRegistration(input: {
   fullName: string
@@ -137,8 +146,9 @@ export async function clearPendingRegistration(email: string): Promise<void> {
 }
 
 /**
- * Finalizes a staged registration after Supabase confirms the email. Creates
- * the local account + trial (once) and signs the user in. Returns null when
+ * Finalizes a staged registration after Supabase confirms the email. Creates the
+ * local account (with a default trial) and signs the user in. The POS type and
+ * plan duration are chosen next, on the /onboarding wizard. Returns null when
  * there is no staged registration (e.g. confirmed on another device) — the
  * caller routes the user to sign in.
  */

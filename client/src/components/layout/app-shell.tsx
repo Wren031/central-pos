@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
@@ -42,78 +42,122 @@ import { printerService } from '@/database/repos/printer'
 import { useSubscription } from '@/state/subscription-context'
 import { StatusBadge } from '@/components/common/status-badge'
 
-const MAIN_NAV = [
-  { to: '/', label: 'Dashboard', icon: Home, end: true },
-  { to: '/pos', label: 'POS Workspace', icon: Grid2X2 },
-  { to: '/subscription', label: 'Subscription', icon: CreditCard },
-  { to: '/profile', label: 'Profile', icon: User },
+interface NavItem {
+  id: string
+  to: string
+  label: string
+  icon: React.ElementType
+  /** Anchor to the exact path instead of also matching sub-paths. */
+  end?: boolean
+}
+
+const MAIN_NAV: NavItem[] = [
+  { id: 'dashboard', to: '/', label: 'Dashboard', icon: Home, end: true },
+  { id: 'pos-workspace', to: '/pos', label: 'POS Workspace', icon: Grid2X2 },
+  { id: 'subscription', to: '/subscription', label: 'Subscription', icon: CreditCard },
+  { id: 'profile', to: '/profile', label: 'Profile', icon: User },
 ]
 
-const POS_NAV = [
-  { to: '/pos', label: 'Overview', icon: Home, end: true },
-  { to: '/pos/catalog', label: 'Catalog', icon: Package },
-  { to: '/pos/inventory', label: 'Inventory', icon: ScrollText },
-  { to: '/pos/orders', label: 'Orders', icon: ReceiptText },
-  { to: '/pos/reports', label: 'Reports', icon: ChartNoAxesColumnIncreasing },
-  { to: '/pos/settings', label: 'Settings', icon: Settings },
+const POS_NAV: NavItem[] = [
+  { id: 'pos-overview', to: '/pos', label: 'Overview', icon: Home, end: true },
+  { id: 'pos-catalog', to: '/pos/catalog', label: 'Catalog', icon: Package },
+  { id: 'pos-inventory', to: '/pos/inventory', label: 'Inventory', icon: ScrollText },
+  { id: 'pos-orders', to: '/pos/orders', label: 'Orders', icon: ReceiptText },
+  { id: 'pos-reports', to: '/pos/reports', label: 'Reports', icon: ChartNoAxesColumnIncreasing },
+  { id: 'pos-settings', to: '/pos/settings', label: 'Settings', icon: Settings },
 ]
 
-function NavItems({ onNavigate, variant = 'sidebar' }: { onNavigate?: () => void; variant?: 'sidebar' | 'sheet' }) {
-  const { store } = useAuth()
-  const baseClass =
+/** Does `pathname` fall on this target — exactly, or under it as a sub-path? */
+function underNavPath(pathname: string, to: string, end?: boolean) {
+  if (to === '/') return pathname === '/'
+  if (end) return pathname === to
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+/**
+ * Resolve exactly ONE active nav item for the current pathname across every
+ * group. Two entries target `/pos` ("POS Workspace" and "Overview"), and the
+ * former has no exact anchor, so per-link matching previously lit up several
+ * rows at once. Preference: an exact match, otherwise the longest matching
+ * prefix. On an exact tie (two links to the same path) the first declared
+ * entry wins, so a fresh `/pos` load lights the "POS Workspace" section link.
+ */
+function resolveActiveNavId(pathname: string, items: NavItem[]): string | null {
+  const candidates = items.filter((item) => underNavPath(pathname, item.to, item.end))
+  if (candidates.length === 0) return null
+  const exact = candidates.filter((item) => item.to === pathname)
+  const pool = exact.length > 0 ? exact : candidates
+  return pool.reduce((best, item) => (item.to.length > best.to.length ? item : best)).id
+}
+
+/**
+ * Nav item classes. The active state is built as a full variant (rather than
+ * appending an override onto a shared base with its own `hover:bg-*`) so the
+ * selected pill is reliably black instead of losing a specificity race with
+ * the hover background.
+ */
+function navItemClass(variant: 'sidebar' | 'sheet', isActive: boolean) {
+  const layout =
     variant === 'sidebar'
-      ? 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-      : 'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted'
+      ? 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors'
+      : 'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors'
+  const state =
+    variant === 'sidebar'
+      ? isActive
+        ? 'bg-black text-white hover:bg-black'
+        : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+      : isActive
+        ? 'bg-muted text-foreground'
+        : 'text-muted-foreground hover:bg-muted'
+  return cn(layout, state)
+}
+
+function NavItems({
+  onNavigate,
+  variant = 'sidebar',
+  activeId,
+  onActivate,
+}: {
+  onNavigate?: () => void
+  variant?: 'sidebar' | 'sheet'
+  /** The one globally-active item id (owned by the parent shell). */
+  activeId: string | null
+  /** Report a click so duplicate-path links (POS Workspace / Overview) can be told apart. */
+  onActivate: (id: string) => void
+}) {
+  const { store } = useAuth()
+
+  const renderItem = (item: NavItem) => {
+    const isActive = item.id === activeId
+    return (
+      <Link
+        key={item.id}
+        to={item.to}
+        onClick={() => {
+          onActivate(item.id)
+          onNavigate?.()
+        }}
+        aria-current={isActive ? 'page' : undefined}
+        className={navItemClass(variant, isActive)}
+      >
+        <item.icon className="size-4" aria-hidden />
+        {item.label}
+      </Link>
+    )
+  }
+
   return (
     <nav className="flex flex-col gap-1" aria-label="Main">
       <p className="px-3 pb-1 pt-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
         Platform
       </p>
-      {MAIN_NAV.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              baseClass,
-              isActive &&
-                (variant === 'sidebar'
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'bg-muted text-foreground')
-            )
-          }
-        >
-          <item.icon className="size-4" aria-hidden />
-          {item.label}
-        </NavLink>
-      ))}
+      {MAIN_NAV.map(renderItem)}
       {store?.onboarded && (
         <>
           <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             {getPosType(store.posType).name}
           </p>
-          {POS_NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  baseClass,
-                  isActive &&
-                    (variant === 'sidebar'
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'bg-muted text-foreground')
-                )
-              }
-            >
-              <item.icon className="size-4" aria-hidden />
-              {item.label}
-            </NavLink>
-          ))}
+          {POS_NAV.map(renderItem)}
         </>
       )}
     </nav>
@@ -314,6 +358,24 @@ export function AppShell() {
   const posDef = store ? getPosType(store.posType) : null
   const accent = posDef?.theme.accent
 
+  // Every nav target the sidebar can show, in display order.
+  const navItems = React.useMemo(
+    () => (store?.onboarded ? [...MAIN_NAV, ...POS_NAV] : MAIN_NAV),
+    [store?.onboarded]
+  )
+
+  // The item the user last pressed. Kept separate from the route so the two
+  // `/pos` links ("POS Workspace" / "Overview") can be told apart.
+  const [pickedNavId, setPickedNavId] = React.useState<string | null>(null)
+
+  // Derived during render — no effect needed. Honor the clicked item while its
+  // own link still covers the current URL; otherwise fall back to the route.
+  const activeNavId = React.useMemo(() => {
+    const picked = pickedNavId ? navItems.find((item) => item.id === pickedNavId) : null
+    if (picked && underNavPath(location.pathname, picked.to, picked.end)) return picked.id
+    return resolveActiveNavId(location.pathname, navItems)
+  }, [pickedNavId, navItems, location.pathname])
+
   React.useEffect(() => {
     setMobileOpen(false)
   }, [location.pathname])
@@ -333,7 +395,7 @@ export function AppShell() {
           <Brand />
         </div>
         <ScrollArea className="flex-1 px-3 pb-4">
-          <NavItems />
+          <NavItems activeId={activeNavId} onActivate={setPickedNavId} />
         </ScrollArea>
         <div className="border-t p-3">
           <UserMenu />
@@ -399,7 +461,12 @@ export function AppShell() {
             </SheetTrigger>
           </SheetHeader>
           <div className="px-3 pb-6">
-            <NavItems onNavigate={() => setMobileOpen(false)} variant="sheet" />
+            <NavItems
+              onNavigate={() => setMobileOpen(false)}
+              variant="sheet"
+              activeId={activeNavId}
+              onActivate={setPickedNavId}
+            />
           </div>
           <div className="absolute inset-x-3 bottom-4">
             <UserMenu withLabel />

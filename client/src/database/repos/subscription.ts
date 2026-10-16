@@ -106,3 +106,41 @@ export async function activatePlanFromServer(input: ActivatePlanInput): Promise<
 export function getTransactions(userId: string): Transaction[] {
   return getCache().transactions.filter((t) => t.userId === userId)
 }
+
+export interface InitialPlanInput {
+  userId: string
+  planId: PlanId
+  planName?: string
+  durationDays: number
+}
+
+/**
+ * Sets the starting plan + duration chosen during onboarding. No charge is made
+ * here — payment (if any) happens later on the Subscription page. Replaces the
+ * default trial subscription created when the account was confirmed.
+ */
+export async function setInitialSubscription(input: InitialPlanInput): Promise<Subscription> {
+  const existing = await db.subscriptions.where('userId').equals(input.userId).first()
+  const now = mockClock.now()
+  const durationDays = input.durationDays > 0 ? input.durationDays : 30
+  const sub: Subscription = {
+    id: existing?.id ?? newId('sub'),
+    userId: input.userId,
+    plan: input.planId,
+    planName: input.planName,
+    durationDays,
+    startedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + durationDays * 86400000).toISOString(),
+    pricePaid: existing?.pricePaid ?? 0,
+    active: true,
+  }
+  await db.transaction('rw', db.subscriptions, db.syncQueue, async () => {
+    await db.subscriptions.put(sub)
+    await putSyncOp(syncOpFor('subscription', sub.id, 'update', undefined, { plan: input.planId }))
+  })
+  patchCache({
+    subscriptions: [sub, ...getCache().subscriptions.filter((s) => s.userId !== input.userId)],
+  })
+  notifySyncQueueChanged()
+  return sub
+}

@@ -50,7 +50,7 @@ export function ConfirmPage() {
 
         setPhase('confirmed')
         refresh()
-        toast.success('Email confirmed — your 30-day free trial is active!')
+        toast.success('Email confirmed — let’s set up your workspace!')
         navigate('/onboarding', { replace: true })
       } catch (err) {
         if (!active) return

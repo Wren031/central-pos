@@ -136,7 +136,7 @@ export function RegisterPage() {
     setSignupError(null)
 
     // Already have a local account for this email? Send them to sign in
-    // instead of creating a duplicate account or a second trial.
+    // instead of creating a duplicate account.
     if (await isEmailRegistered(email)) {
       setSignupError('This email is already registered. Please sign in instead.')
       return
@@ -152,11 +152,10 @@ export function RegisterPage() {
       }
       setSendingLink(true)
       try {
-        // An explicit new signup lifts any deletion tombstone for this email, so
-        // a user who deletes and later re-registers is not locked out.
+        // An explicit new signup lifts any deletion tombstone for this email.
         clearAccountDeleted(email)
-        // Stage the local account (password hashed locally) so the /auth/confirm
-        // redirect can finalize it, then ask Supabase to email the link.
+        // Stage the local account so the /auth/confirm redirect can finalize it,
+        // then ask Supabase to email the confirmation link.
         await stagePendingRegistration({
           fullName: values.fullName,
           address: values.address,
@@ -226,7 +225,7 @@ export function RegisterPage() {
       eyebrow={
         <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
           <Sparkles className="size-3" aria-hidden />
-          30-day free trial · No card required
+          No card required
         </span>
       }
       title="Create your account"

@@ -46,6 +46,7 @@ export {
   computeSubState,
   getSubState,
   activatePlanFromServer,
+  setInitialSubscription,
   getTransactions,
 } from '@/database/repos/subscription'
 

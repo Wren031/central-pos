@@ -1,17 +1,17 @@
 import * as React from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { Check, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { getPosType, getPosTypes, isPosCatalogEmpty } from '@/lib/pos-types'
 import { refreshPosCatalog, getPosCatalogError } from '@/services/pos-catalog-service'
-import { setupStore } from '@/lib/repos'
+import { setInitialSubscription, setupStore } from '@/lib/repos'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
+import { useSubscription } from '@/state/subscription-context'
+import { useOnlineStatus } from '@/hooks/use-online-status'
 import { Brand } from '@/components/common/brand'
+import { PlanDurationStep, PosTypeStep } from './onboarding-steps'
 
 const SETUP_STEPS = [
   'Provisioning workspace…',
@@ -21,56 +21,16 @@ const SETUP_STEPS = [
   'Almost ready…',
 ]
 
-function PosPreview({ posType }: { posType: string }) {
-  const def = getPosType(posType)
-  const t = def.theme
-  return (
-    <div
-      className="relative h-24 overflow-hidden rounded-lg border"
-      style={{ backgroundColor: t.accentSoft }}
-      aria-hidden
-    >
-      <div className="flex items-center gap-1.5 border-b bg-white/70 px-2 py-1.5">
-        <span className="size-2 rounded-full" style={{ backgroundColor: t.chart[0] }} />
-        <span className="size-2 rounded-full bg-black/10" />
-        <span className="size-2 rounded-full bg-black/10" />
-        <span className="ml-1 text-[8px] font-semibold" style={{ color: t.accent }}>
-          {def.name}
-        </span>
-      </div>
-      <div className="grid grid-cols-[1fr_auto] gap-1.5 p-2">
-        <div className="grid grid-cols-3 gap-1">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-9 rounded bg-white/80"
-              style={{ borderBottom: `3px solid ${t.chart[i % 3]}` }}
-            />
-          ))}
-          <div className="col-span-3 flex h-6 items-end gap-0.5 rounded bg-white/60 px-1 py-0.5">
-            {[40, 65, 35, 80, 55, 70, 45].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-t"
-                style={{ height: `${h}%`, backgroundColor: t.chart[i % 3], opacity: 0.85 }}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="w-12 space-y-1 rounded bg-white/80 p-1">
-          <div className="h-1.5 rounded bg-black/10" />
-          <div className="h-1.5 w-2/3 rounded" style={{ backgroundColor: t.accent }} />
-          <div className="mt-2 h-3 rounded" style={{ backgroundColor: t.accent }} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function OnboardingPage() {
   const { user, store, refresh, setStoreLocal } = useAuth()
+  const { allPlans, plansLoading, plansError } = useSubscription()
+  const online = useOnlineStatus()
   const navigate = useNavigate()
+
+  // Post-verification wizard: POS type → plan duration → workspace.
+  const [stage, setStage] = React.useState<'pos' | 'plan'>('pos')
   const [selected, setSelected] = React.useState<string | null>(store?.posType ?? null)
+  const [planId, setPlanId] = React.useState<string | null>(null)
   const [generating, setGenerating] = React.useState(false)
   const [step, setStep] = React.useState(0)
   const [types, setTypes] = React.useState(() => getPosTypes())
@@ -99,6 +59,13 @@ export function OnboardingPage() {
     return () => window.removeEventListener('cpos:data-changed', sync)
   }, [load])
 
+  // Default the duration step to the free trial (or the first plan) once loaded.
+  React.useEffect(() => {
+    if (stage !== 'plan' || planId || allPlans.length === 0) return
+    const trial = allPlans.find((p) => p.isTrial) ?? allPlans[0]
+    setPlanId(trial.id)
+  }, [stage, planId, allPlans])
+
   if (!user) return <Navigate to="/login" replace />
 
   // POS type is chosen once during first-time setup — account holders cannot switch.
@@ -125,7 +92,16 @@ export function OnboardingPage() {
       setStep((s) => Math.min(s + 1, SETUP_STEPS.length - 1))
     }, 550)
     try {
+      const plan = allPlans.find((p) => p.id === planId)
       const s = await setupStore(user.id, selected)
+      if (plan) {
+        await setInitialSubscription({
+          userId: user.id,
+          planId: plan.id,
+          planName: plan.name,
+          durationDays: plan.durationDays,
+        })
+      }
       clearInterval(timer)
       setStoreLocal(s)
       refresh()
@@ -186,136 +162,36 @@ export function OnboardingPage() {
         <div className="flex w-full items-center justify-between px-4 py-4 sm:px-6">
           <Brand />
           <Badge variant="outline" className="hidden border-emerald-200 bg-emerald-50 text-emerald-700 sm:inline-flex">
-            30-day free trial active
+            Workspace setup
           </Badge>
         </div>
       </header>
-      <main className="w-full px-4 py-8 sm:px-6">
-        <div className="mb-8 text-center">
-          <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Step 2 of 2 · Choose your POS
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            What kind of business are you running?
-          </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Pick the workspace that fits your trade. Your catalog starts empty — add your own
-            products after setup. You can switch types later in settings.
-          </p>
-        </div>
-
-        {error ? (
-          <Card className="mx-auto max-w-md gap-3 p-6 text-center shadow-none">
-            <div className="flex flex-col items-center gap-3">
-              <span className="flex size-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-                <RefreshCw className="size-6" aria-hidden />
-              </span>
-              <div>
-                <p className="font-medium">Couldn’t load POS types</p>
-                <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-              </div>
-              <Button onClick={() => void load()} disabled={loading}>
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-                Retry
-              </Button>
-            </div>
-          </Card>
-        ) : loading && types.length === 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <Skeleton key={i} className="h-64" />
-            ))}
-          </div>
-        ) : types.length === 0 ? (
-          <div className="rounded-xl border bg-muted/30 py-16 text-center">
-            <p className="font-medium">No POS types available</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              An administrator hasn’t published any POS types yet. Please check back later.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {types.map((type) => {
-              const isSelected = selected === type.id
-              return (
-                <Card
-                  key={type.id}
-                  role="radio"
-                  aria-checked={isSelected}
-                  tabIndex={0}
-                  onClick={() => setSelected(type.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      setSelected(type.id)
-                    }
-                  }}
-                  className={cn(
-                    'relative cursor-pointer gap-3 p-4 shadow-none transition-all hover:border-foreground/25 hover:shadow-sm',
-                    isSelected && 'border-2 shadow-md ring-1 ring-foreground/10'
-                  )}
-                  style={isSelected ? { borderColor: type.theme.accent } : undefined}
-                >
-                  {isSelected && (
-                    <span
-                      className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full text-white"
-                      style={{ backgroundColor: type.theme.accent }}
-                      aria-hidden
-                    >
-                      <Check className="size-3" />
-                    </span>
-                  )}
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="flex size-10 shrink-0 items-center justify-center rounded-lg text-white"
-                      style={{ backgroundColor: type.theme.accent }}
-                    >
-                      <type.icon className="size-5" aria-hidden />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold">{type.name}</p>
-                      <p className="text-xs text-muted-foreground">{type.tagline}</p>
-                    </div>
-                  </div>
-                  <PosPreview posType={type.id} />
-                  <p className="text-xs leading-relaxed text-muted-foreground">{type.description}</p>
-                  {type.categories.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {type.categories.slice(0, 5).map((c) => (
-                        <span
-                          key={c}
-                          className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                      {type.categories.length > 5 && (
-                        <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                          +{type.categories.length - 5} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="sticky bottom-16 z-10 mt-8 flex flex-col items-center gap-3 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur md:bottom-4 sm:flex-row sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            {selected ? (
-              <>
-                Selected: <span className="font-medium text-foreground">{getPosType(selected).name}</span>
-              </>
-            ) : (
-              'Select a POS type to continue'
-            )}
-          </p>
-          <Button size="lg" disabled={!selected} onClick={handleGenerate} className="w-full sm:w-auto">
-            <Sparkles className="size-4" />
-            Generate my POS workspace
-          </Button>
+      <main className="w-full px-4 py-10 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl">
+          {stage === 'pos' ? (
+            <PosTypeStep
+              types={types}
+              loading={loading}
+              error={error}
+              selected={selected}
+              onSelect={setSelected}
+              onRetry={() => void load()}
+              onContinue={() => setStage('plan')}
+            />
+          ) : (
+            <PlanDurationStep
+              plans={allPlans}
+              loading={plansLoading}
+              error={plansError}
+              selected={planId}
+              onSelect={setPlanId}
+              onContinue={() => void handleGenerate()}
+              onBack={() => setStage('pos')}
+              submitting={generating}
+              offline={!online}
+              submitLabel="Create my workspace"
+            />
+          )}
         </div>
       </main>
     </div>

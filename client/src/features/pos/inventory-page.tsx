@@ -1,46 +1,10 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  AlertTriangle,
-  ImagePlus,
-  Loader2,
-  Package,
-  PackagePlus,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { AlertTriangle, Package, PackagePlus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { z } from 'zod'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -62,348 +26,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/common/empty-state'
 import { peso } from '@/lib/format'
-import { fileToProductImage, productImage } from '@/lib/mock-image'
-import { DEFAULT_UNIT, PRODUCT_UNITS, formatQty, unitLabel } from '@/lib/units'
-import { getCategories, addProduct, deleteProduct, getProducts, updateProduct } from '@/lib/repos'
+import { productImage } from '@/lib/mock-image'
+import { formatQty } from '@/lib/units'
+import { getCategories, deleteProduct, getProducts } from '@/lib/repos'
 import type { Product } from '@/lib/types'
-import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 import { AdjustStockDialog } from './adjust-stock-dialog'
-
-const schema = z.object({
-  name: z.string().min(2, 'Product name is required.'),
-  category: z.string().min(1, 'Pick a category.'),
-  price: z.number().min(0.01, 'Price must be greater than 0.'),
-  stock: z.number().int('Stock must be a whole number.').min(0, 'Cannot be negative.'),
-  unit: z.string(),
-  image: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof schema>
-
-function ProductDialog({
-  open,
-  onOpenChange,
-  product,
-  categories,
-  storeId,
-  onSaved,
-}: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  product: Product | null
-  categories: string[]
-  storeId: string
-  onSaved: () => void
-}) {
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: '', category: categories[0] ?? '', price: 0, stock: 0, unit: DEFAULT_UNIT, image: '' },
-  })
-
-  const fileRef = React.useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = React.useState(false)
-  const [dragOver, setDragOver] = React.useState(false)
-
-  React.useEffect(() => {
-    if (open) {
-      if (product) {
-        form.reset({
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          stock: product.stock,
-          unit: product.unit ?? DEFAULT_UNIT,
-          image: product.image ?? '',
-        })
-      } else {
-        form.reset({ name: '', category: categories[0] ?? '', price: 0, stock: 0, unit: DEFAULT_UNIT, image: '' })
-      }
-    }
-  }, [open, product, categories, form])
-
-  async function handleFile(file: File) {
-    setUploading(true)
-    try {
-      const src = await fileToProductImage(file)
-      form.setValue('image', src, { shouldDirty: true })
-      toast.success('Image added')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not read image.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (file) void handleFile(file)
-  }
-
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) void handleFile(file)
-  }
-
-  async function onSubmit(values: FormValues) {
-    try {
-      if (product) {
-        await updateProduct(product.id, { ...values, image: values.image || undefined })
-        toast.success('Product updated')
-      } else {
-        await addProduct(storeId, { ...values, emoji: '📦', image: values.image || undefined })
-        toast.success('Product added')
-      }
-      onSaved()
-      onOpenChange(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save product.')
-    }
-  }
-
-  const nameValue = form.watch('name')
-  const imageValue = form.watch('image')
-  const unitValue = form.watch('unit')
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent showCloseButton={false} side="right" className="w-full gap-0 p-0 sm:max-w-md">
-        <SheetHeader className="relative shrink-0 border-b px-4 py-3.5 pr-12 sm:px-6">
-          <SheetTitle>{product ? 'Edit product' : 'Add product'}</SheetTitle>
-          <SheetDescription>
-            {product
-              ? 'Update details, image, and stock levels.'
-              : 'Add an item to your catalog. It will appear on the Sell screen.'}
-          </SheetDescription>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="absolute top-3 right-3"
-            aria-label="Close"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="size-4" />
-          </Button>
-        </SheetHeader>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <Form {...form} onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <FormField
-              control={form.control}
-              name="image"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Product image</FormLabel>
-                    <span className="text-[11px] text-muted-foreground">PNG or JPG · drag & drop supported</span>
-                  </div>
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      setDragOver(true)
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={onDrop}
-                    className={cn(
-                      'relative aspect-[16/7] w-full overflow-hidden rounded-xl border-2 border-dashed bg-muted/30 transition-colors',
-                      dragOver && 'border-primary bg-primary/5'
-                    )}
-                  >
-                    <img
-                      src={imageValue || productImage(nameValue || 'Product', '📦')}
-                      alt=""
-                      className={cn(
-                        'absolute inset-0 size-full object-cover transition-all',
-                        imageValue ? '' : 'opacity-60'
-                      )}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileRef.current?.click()}
-                      className="group absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/45 text-white opacity-0 transition-opacity focus-visible:opacity-100 hover:opacity-100"
-                      aria-label={imageValue ? 'Change product image' : 'Choose product image'}
-                    >
-                      {uploading ? (
-                        <Loader2 className="size-6 animate-spin" aria-hidden />
-                      ) : (
-                        <ImagePlus className="size-6" aria-hidden />
-                      )}
-                      <span className="text-sm font-medium">
-                        {uploading ? 'Processing image…' : imageValue ? 'Click to change image' : 'Click to browse or drop an image'}
-                      </span>
-                      <span className="text-xs text-white/75">Recommended 4:3 · max 480px</span>
-                    </button>
-                    {imageValue && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="absolute top-2 right-2 shadow-sm"
-                        onClick={() => field.onChange('')}
-                      >
-                        <X className="size-3.5" /> Remove
-                      </Button>
-                    )}
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      aria-label="Choose product image"
-                      onChange={onPickFile}
-                    />
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Details</p>
-              <div className="space-y-4 rounded-xl border bg-muted/20 p-3.5">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Chicken Inasal" autoFocus={!product} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pricing &amp; stock</p>
-              <div className="grid gap-4 rounded-xl border bg-muted/20 p-3.5 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Selling price</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-                            ₱
-                          </span>
-                          <Input
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            className="pl-7 tabular-nums"
-                            value={field.value ? String(field.value) : ''}
-                            onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                          />
-                        </div>
-                      </FormControl>
-                      <p className="text-[11px] text-muted-foreground">Price per {unitLabel(unitValue)} at checkout.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock on hand</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            inputMode="numeric"
-                            placeholder="0"
-                            className="pr-16 tabular-nums"
-                            value={String(field.value)}
-                            onChange={(e) => field.onChange(Math.floor(Number(e.target.value) || 0))}
-                          />
-                          <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                            {unitLabel(unitValue)}
-                          </span>
-                        </div>
-                      </FormControl>
-                      <p className="text-[11px] text-muted-foreground">Low-stock alert at 10 or fewer.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="unit"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>Unit of measure</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {PRODUCT_UNITS.map((u) => (
-                            <SelectItem key={u} value={u}>
-                              {u}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-muted-foreground">
-                        How this item is counted — applied to pricing and stock (pc, bottle, kg…).
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-background px-4 pt-3 pb-3 sm:-mx-6 sm:px-6 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting || uploading}>
-                {form.formState.isSubmitting && <Loader2 className="size-4 animate-spin" />}
-                {product ? 'Save changes' : 'Add to catalog'}
-              </Button>
-            </div>
-          </Form>
-          </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
+import { ProductDialog } from './product-dialog'
 
 export function InventoryPage() {
   const { store } = useAuth()
@@ -419,6 +49,14 @@ export function InventoryPage() {
     if (!store) return
     setProducts(getProducts(store.id))
   }, [store])
+
+  // Stable identity across unrelated re-renders (a new array every render would
+  // be passed straight into the dialog's effect deps).
+  const categories = React.useMemo(
+    () => (store ? getCategories(store.id).map((c) => c.name) : []),
+    // Refresh when the product list changes (i.e. after a data-changed emit).
+    [store, products]
+  )
 
   React.useEffect(() => {
     refresh()
@@ -605,7 +243,7 @@ export function InventoryPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         product={editing}
-        categories={getCategories(store.id).map((c) => c.name)}
+        categories={categories}
         storeId={store.id}
         onSaved={refresh}
       />

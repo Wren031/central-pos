@@ -5,6 +5,7 @@ import {
   getGcashQrConfig,
   getNotifications,
   getPaymentRequests,
+  getAllPlanRecords,
   getPlanRecords,
   getSubState,
   getSubscription,
@@ -38,6 +39,8 @@ interface SubscriptionValue {
   paymentRequests: PaymentRequest[]
   /** Active purchase plans from the admin-managed catalogue. */
   plans: PlanRecord[]
+  /** ALL plans including the trial (used by the signup duration step). */
+  allPlans: PlanRecord[]
   plansLoading: boolean
   plansError: string | null
   /** The ACTIVE GCash QR (url null when none/unset). */
@@ -65,6 +68,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [transactions, setTransactions] = React.useState<Transaction[]>([])
   const [paymentRequests, setPaymentRequests] = React.useState<PaymentRequest[]>([])
   const [plans, setPlans] = React.useState<PlanRecord[]>([])
+  const [allPlans, setAllPlans] = React.useState<PlanRecord[]>([])
   const [gcashQr, setGcashQr] = React.useState<GcashQrConfig>({
     url: null,
     active: false,
@@ -76,6 +80,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   const refresh = React.useCallback(() => {
     setPlans(getPlanRecords())
+    setAllPlans(getAllPlanRecords())
     setGcashQr(getGcashQrConfig())
     if (!user) {
       setSub(null)
@@ -152,6 +157,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       transactions,
       paymentRequests,
       plans,
+      allPlans,
       plansLoading,
       plansError,
       gcashQr,
@@ -167,6 +173,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       transactions,
       paymentRequests,
       plans,
+      allPlans,
       plansLoading,
       plansError,
       gcashQr,

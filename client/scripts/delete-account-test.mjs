@@ -157,6 +157,50 @@ async function makeContext(browser, { deleteMode = 'ok' } = {}) {
   const fulfillJson = (route, status, body) =>
     route.fulfill({ status, headers: CORS, body: JSON.stringify(body) })
 
+  await context.route('**/rest/v1/pos_types**', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: CORS })
+      : fulfillJson(route, 200, [
+          {
+            id: 'bbq',
+            name: 'BBQ POS',
+            tagline: 'Grill & skewer counters',
+            description: 'BBQ',
+            icon: 'flame',
+            category: 'food',
+            active: true,
+            sort_order: 1,
+          },
+        ])
+  )
+  await context.route('**/rest/v1/pos_type_categories**', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: CORS })
+      : fulfillJson(route, 200, [])
+  )
+  await context.route('**/rest/v1/subscription_plans**', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: CORS })
+      : fulfillJson(route, 200, [
+          {
+            id: 'trial',
+            name: 'Free Trial',
+            description: 'No card required.',
+            duration_days: 30,
+            price: 0,
+            currency: 'PHP',
+            is_trial: true,
+            active: true,
+            features: [],
+            sort_order: 0,
+          },
+        ])
+  )
+  await context.route('**/rest/v1/rpc/public_gcash_qr**', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: CORS })
+      : fulfillJson(route, 200, { url: null, active: false })
+  )
   await context.route('**/rest/v1/rpc/client_account_status', (route) =>
     route.request().method() === 'OPTIONS'
       ? route.fulfill({ status: 204, headers: CORS })

@@ -36,31 +36,69 @@ export function productImage(name: string, emoji: string): string {
 
 export function fileToProductImage(file: File, maxSize = 480): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('image/')) {
-      reject(new Error('File is not an image.'))
+    if (!file.type || !file.type.startsWith('image/')) {
+      reject(new Error('Please choose an image file (PNG, JPG, WebP or GIF).'))
       return
     }
+    if (file.size > 12 * 1024 * 1024) {
+      reject(new Error('That image is too large (max 12 MB). Please choose a smaller one.'))
+      return
+    }
+
     const url = URL.createObjectURL(file)
     const img = new Image()
-    img.onload = () => {
+    let settled = false
+
+    const fail = (message: string) => {
+      if (settled) return
+      settled = true
       URL.revokeObjectURL(url)
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
-      const w = Math.max(1, Math.round(img.width * scale))
-      const h = Math.max(1, Math.round(img.height * scale))
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        reject(new Error('Canvas unavailable.'))
-        return
+      reject(new Error(message))
+    }
+    const finish = (dataUrl: string) => {
+      if (settled) return
+      settled = true
+      URL.revokeObjectURL(url)
+      resolve(dataUrl)
+    }
+
+    // A decode that never fires onload/onerror (corrupt or unsupported file)
+    // must not leave the UI stuck on "Processing image…".
+    const timer = setTimeout(
+      () => fail('That image could not be processed. Try a different file.'),
+      15000
+    )
+
+    img.onload = () => {
+      // Everything below can throw (decode/OOM/encode) — always settle.
+      try {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          clearTimeout(timer)
+          fail('This device could not process the image.')
+          return
+        }
+        ctx.drawImage(img, 0, 0, w, h)
+        let dataUrl = canvas.toDataURL('image/jpeg', 0.78)
+        // Re-encode smaller if the result is still heavy for local storage.
+        if (dataUrl.length > 400_000) dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+        clearTimeout(timer)
+        finish(dataUrl)
+      } catch {
+        clearTimeout(timer)
+        fail('That image could not be processed. Try a different file.')
       }
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', 0.78))
     }
     img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Could not load that image.'))
+      clearTimeout(timer)
+      // HEIC and other formats a browser cannot decode land here.
+      fail('That image format is not supported. Please use a PNG, JPG or WebP.')
     }
     img.src = url
   })
