@@ -23,6 +23,7 @@ const files = [
   'src/lib/format.ts',
   'src/lib/mock-clock.ts',
   'src/lib/types.ts',
+  'src/lib/units.ts',
 ]
 
 const program = ts.createProgram(files, {
@@ -48,6 +49,7 @@ patch('print/raster/receipt-raster.js', [
   ["from './font'", "from './font.js'"],
   ["from '../../format'", "from '../../format.js'"],
   ["from '../../types'", "from '../../types.js'"],
+  ["from '../../units'", "from '../../units.js'"],
 ])
 patch('format.js', [["from './mock-clock'", "from './mock-clock.js'"]])
 
@@ -147,9 +149,12 @@ function makeFakePrinter(opts = {}) {
     paperByte = null,
     statusLen = 10,
     corruptChecksum = false,
+    /** Optional per-read error-flag sequence (the Nth A1 uses index N). */
+    errorFlags = null,
   } = opts
   const frames = []
   const dataLines = []
+  let statusReads = 0
   let cb = () => {}
   let expectedCrc = 0
   const emit = (cmd, payload) => setTimeout(() => cb(notifyBytes(cmd, payload)), 0)
@@ -163,7 +168,10 @@ function makeFakePrinter(opts = {}) {
         p[0] = 0
         p[3] = supply
         p[4] = temp
-        p[6] = errorFlag
+        p[6] = errorFlags
+          ? errorFlags[Math.min(statusReads, errorFlags.length - 1)]
+          : errorFlag
+        statusReads++
         if (p.length > 7) p[7] = errorCode
         if (p.length > 9) p[9] = paperByte ?? (paperOk ? 0x00 : 0x07)
         emit(0xa1, p)
@@ -269,6 +277,54 @@ function makeImage(lines) {
   check('the error-flag no-paper path prints nothing', fake.dataLines.length === 0)
 }
 
+// 5d-4. an advisory flag bit (0x01) must NOT block. It is the value the
+// reference never decoded, and healthy units report it — the bug being fixed.
+{
+  const fake = makeFakePrinter({ errorFlags: [0x01] })
+  const session = new Mxw01PrintSession(fake.link)
+  const result = await session.print(makeImage(2), { feedLines: 0 })
+  check('advisory error flag 0x01 does not block the print',
+    result.ok && fake.dataLines.length === 2)
+  check('the advisory flag is surfaced as a warning',
+    typeof session.lastAdvisory === 'string' && /0x01/.test(session.lastAdvisory))
+}
+
+// 5d-4b. an advisory flag is still re-read, and if it clears the warning is gone.
+{
+  const fake = makeFakePrinter({ errorFlags: [0x01, 0x00] })
+  const session = new Mxw01PrintSession(fake.link)
+  const result = await session.print(makeImage(2), { feedLines: 0 })
+  check('a transient advisory flag still prints', result.ok && fake.dataLines.length === 2)
+}
+
+// 5d-5. an UNOBSERVED bit is still a hard refusal — real detection preserved.
+{
+  const fake = makeFakePrinter({ errorFlags: [0x02], supply: 0x30, temp: 28 })
+  const session = new Mxw01PrintSession(fake.link)
+  let threw = null
+  try {
+    await session.print(makeImage(1), { feedLines: 0 })
+  } catch (e) {
+    threw = e
+  }
+  check('an unrecognised error bit still refuses to print', threw instanceof PrinterError)
+  check('the unrecognised-bit refusal prints nothing', fake.dataLines.length === 0)
+  check('the refusal decodes the bits, state, supply and raw bytes',
+    threw && /unrecognised bits 0x02/.test(threw.message) && /supply 48/.test(threw.message) &&
+      /28 C/.test(threw.message) && /\(status [0-9a-f]+\)/.test(threw.message))
+}
+
+// 5d-6. the keepalive must not poll while a ticket is in flight.
+{
+  const fake = makeFakePrinter({ errorFlags: [0x01] })
+  const session = new Mxw01PrintSession(fake.link)
+  const running = session.print(makeImage(2), { feedLines: 0 })
+  const polled = await session.keepalive()
+  check('the keepalive is skipped while printing', polled === null)
+  await running
+  check('the print completes after the skipped keepalive', fake.dataLines.length === 2)
+}
+
 // 5e. too hot
 {
   const fake = makeFakePrinter({ temp: 50 })
@@ -365,6 +421,38 @@ const maxInkX = (() => {
   return max
 })()
 check('rules reach the far right of the 384-dot sheet', maxInkX > 340)
+
+// ---- compact (smallest) raster text size -----------------------------------
+// 6px is the only size that resamples glyphs to half scale; the 8px default is
+// the standard Font-A-equivalent size and must render at full scale.
+const tinyRaster = buildRasterReceipt(order, {
+  storeName: 'Dela Cruz BBQ House',
+  layout: { ...DEFAULT_RECEIPT_LAYOUT, fontSize: '6px' },
+})
+const smallRaster = buildRasterReceipt(order, {
+  storeName: 'Dela Cruz BBQ House',
+  layout: { ...DEFAULT_RECEIPT_LAYOUT, fontSize: 'small' },
+})
+check('6px raster is shorter than the 8px/small raster', tinyRaster.length < smallRaster.length)
+check('compact raster is still whole 48-byte lines', tinyRaster.length % 48 === 0)
+check('compact raster contains ink', tinyRaster.some((b) => b !== 0))
+check('default (8px) raster matches the standard size', receipt.length === smallRaster.length)
+
+const maxInkOf = (bytes) => {
+  let max = 0
+  for (let row = 0; row < bytes.length / 48; row++) {
+    for (let x = 0; x < 384; x++) {
+      if (bytes[row * 48 + (x >> 3)] & (1 << (x & 7))) if (x > max) max = x
+    }
+  }
+  return max
+}
+check('compact rules still span the full 384-dot sheet', maxInkOf(tinyRaster) > 340)
+
+const { downsample } = await mod('print/raster/font.js')
+const ds = downsample([0x1ffff], 17, 2)
+check('downsample halves the glyph cell from 17px to 9px', ds.width === 9 && ds.rows.length === 1)
+check('downsample keeps every stroke (OR, not decimation)', (ds.rows[0] & 0x1ff) === 0x1ff)
 
 console.log(failures === 0 ? '\nAll raster checks passed' : `\n${failures} checks FAILED`)
 process.exit(failures === 0 ? 0 : 1)

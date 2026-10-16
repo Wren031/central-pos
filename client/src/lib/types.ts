@@ -405,6 +405,31 @@ export function receiptFontStep(size: ReceiptFontSize): ReceiptFontPrintStep {
   return 1
 }
 
+/** How a receipt font size is realized on an ESC/POS printer. */
+export interface ReceiptFontPlan {
+  /** true = Font B (9x17, the smallest font), false = Font A (12x24). */
+  fontB: boolean
+  /** GS ! / ESC ! magnification bitfield: 0x00 native, 0x10 double width, 0x11 double both. */
+  flag: number
+}
+
+/**
+ * Resolve a size to an ESC/POS font + magnification.
+ *
+ * Only the very smallest size (6px) uses Font B — the smallest size a thermal
+ * printer can physically print (ESC/POS has no sub-native size; `GS !`/`ESC !`
+ * only magnify). Everything from 8px up uses Font A, the standard receipt font,
+ * which also avoids the firmware that ignores `ESC M`. 11–12px double the
+ * width, ≥13px double both.
+ */
+export function receiptFontPlan(size: ReceiptFontSize): ReceiptFontPlan {
+  const px = RECEIPT_FONT_PX[size]
+  if (px <= 6) return { fontB: true, flag: 0x00 }
+  if (px >= 13) return { fontB: false, flag: 0x11 }
+  if (px >= 11) return { fontB: false, flag: 0x10 }
+  return { fontB: false, flag: 0x00 }
+}
+
 /** Customizable receipt layout, applied by the ESC/POS encoder. */
 export interface ReceiptLayout {
   /** Print the store address under the store name. */
@@ -432,7 +457,7 @@ export const DEFAULT_RECEIPT_LAYOUT: ReceiptLayout = {
   showUnitPrice: true,
   showBreakdown: true,
   headerStyle: 'full',
-  fontSize: 'small',
+  fontSize: '8px',
   footerText: 'Salamat po! Please come again.',
 }
 
@@ -441,7 +466,6 @@ export interface PrinterSettings {
   deviceId: string | null
   deviceName: string | null
   protocol: PrinterProtocol | null
-  autoPrint: boolean
   paperWidth: 58 | 80
   layout: ReceiptLayout
   updatedAt: string

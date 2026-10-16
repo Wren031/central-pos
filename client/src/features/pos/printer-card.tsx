@@ -24,7 +24,6 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -32,7 +31,6 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { printerService } from '@/database/repos/printer'
 import type { PrinterState } from '@/database/repos/printer'
-import type { ReceiptLayout } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 
 function SignalBar({ rssi }: { rssi?: number }) {
@@ -253,21 +251,6 @@ export function PrinterCard() {
 
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium">Auto-print receipts</p>
-            <p className="text-xs text-muted-foreground">
-              Print automatically after each sale.
-            </p>
-          </div>
-          <Switch
-            checked={state.autoPrint}
-            disabled={!state.supported}
-            onCheckedChange={(v) => void printerService.setAutoPrint(v)}
-            aria-label="Auto-print receipts"
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-0.5">
             <p className="text-sm font-medium">Paper width</p>
             <p className="text-xs text-muted-foreground">Matches your roll — 58mm or 80mm.</p>
           </div>
@@ -311,37 +294,6 @@ export function PrinterCard() {
               <SelectContent>
                 <SelectItem value="full">Full</SelectItem>
                 <SelectItem value="compact">Compact</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-0.5">
-              <p className="text-sm">Font size</p>
-              <p className="text-xs text-muted-foreground">
-                Applies to the printed receipt — bigger sizes print wider/taller.
-              </p>
-            </div>
-            <Select
-              value={state.layout.fontSize}
-              onValueChange={(v) =>
-                void printerService.setLayout({ fontSize: v as ReceiptLayout['fontSize'] })
-              }
-            >
-              <SelectTrigger className="w-32" aria-label="Receipt font size">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="small">Small</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="large">Large</SelectItem>
-                <SelectSeparator />
-                <SelectItem value="6px">6px</SelectItem>
-                <SelectItem value="8px">8px</SelectItem>
-                <SelectItem value="9px">9px</SelectItem>
-                <SelectItem value="10px">10px</SelectItem>
-                <SelectItem value="11px">11px</SelectItem>
-                <SelectItem value="12px">12px</SelectItem>
               </SelectContent>
             </Select>
           </div>

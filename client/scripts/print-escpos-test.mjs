@@ -14,6 +14,7 @@ const files = [
   'src/lib/format.ts',
   'src/lib/mock-clock.ts',
   'src/lib/types.ts',
+  'src/lib/units.ts',
 ]
 
 const program = ts.createProgram(files, {
@@ -32,6 +33,7 @@ receiptSrc = receiptSrc
   .replace("from './escpos'", "from './escpos.js'")
   .replace("from '../format'", "from '../format.js'")
   .replace("from '../types'", "from '../types.js'")
+  .replace("from '../units'", "from '../units.js'")
 writeFileSync(receiptPath, receiptSrc)
 const formatPath = join(out, 'format.js')
 let formatSrc = readFileSync(formatPath, 'utf8')
@@ -252,6 +254,43 @@ check(
   'header not truncated by the body font size',
   hex(withFont('medium', longName)).includes(hex(Array.from(longName).map((c) => c.charCodeAt(0))))
 )
+
+// 13. Font B — the smallest size a thermal printer can print, used by the
+// default (6px) layout. ESC M n selects the font; ESC ! bit 0 mirrors it.
+function escMFont(b) {
+  const flags = []
+  for (let i = 0; i < b.length - 2; i++) {
+    if (b[i] === ESC && b[i + 1] === 0x4d) flags.push(b[i + 2])
+  }
+  return flags
+}
+const sixB = withFont('6px')
+check('font 6px selects Font B (ESC M 1)', escMFont(sixB).includes(1))
+check('font small keeps Font A (ESC M 0)', escMFont(smallB).includes(0))
+check(
+  'font 6px mirrors the Font B bit in ESC !',
+  printModeFlags(sixB).some((f) => (f & 0x01) === 0x01)
+)
+check('font 6px body stays native (GS ! 00)', sizeFlags(sixB).includes(0x00))
+check('6px output differs from the old small default', hex(sixB) !== hex(smallB))
+
+// The default layout must now actually print at the smaller font — not just
+// report a different px number in the UI.
+const defaultB = buildReceipt(order, { storeName: 'STORE', paperWidth: 80 })
+const defaults = (n) => hex(Array.from('-'.repeat(n)).map((c) => c.charCodeAt(0)))
+check('default (8px) selects Font A (ESC M 0)', escMFont(defaultB).includes(0))
+check('default (8px) body is native Font A (GS ! 00)', sizeFlags(defaultB).includes(0x00))
+check('default (8px) rule spans 48 cols on 80mm', hex(defaultB).includes(defaults(48)))
+check('default (8px) output differs from 6px', hex(defaultB) !== hex(withFont('6px', 'STORE')))
+
+// Font B cells are 9 dots (vs 12), so more columns fit and the rules must
+// still span the paper: 384/9 = 42 on 58mm, 576/9 = 64 on 80mm.
+const b58 = buildReceipt(order, { storeName: 'X', paperWidth: 58, layout: { ...DEFAULT_RECEIPT_LAYOUT, fontSize: '6px' } })
+const b80 = buildReceipt(order, { storeName: 'X', paperWidth: 80, layout: { ...DEFAULT_RECEIPT_LAYOUT, fontSize: '6px' } })
+const dashes = (n) => hex(Array.from('-'.repeat(n)).map((c) => c.charCodeAt(0)))
+check('58mm Font B rule spans 42 cols', hex(b58).includes(dashes(42)))
+check('80mm Font B rule spans 64 cols', hex(b80).includes(dashes(64)))
+check('Font B rule reaches the paper edge, never past it', !hex(b58).includes(dashes(43)))
 
 console.log(failures === 0 ? '\nAll ESC/POS checks passed' : `\n${failures} checks FAILED`)
 process.exit(failures === 0 ? 0 : 1)

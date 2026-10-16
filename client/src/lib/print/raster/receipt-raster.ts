@@ -9,11 +9,24 @@
  */
 
 import { Canvas, WIDTH_PIXELS } from './canvas'
-import { ADVANCE, BASELINE, fold, glyph, embolden, minimumLeading } from './font'
+import {
+  ADVANCE,
+  COMPACT_FACTOR,
+  advanceFor,
+  baselineFor,
+  cellWidthFor,
+  compactLeading,
+  downsample,
+  fold,
+  glyph,
+  embolden,
+  minimumLeading,
+} from './font'
 import { formatDateTime } from '../../format'
 import { unitLabel } from '../../units'
 import {
   DEFAULT_RECEIPT_LAYOUT,
+  receiptFontPlan,
   receiptFontStep,
   type Order,
   type ReceiptLayout,
@@ -67,19 +80,37 @@ function wrap(text: string, maxChars: number): string[] {
   return lines
 }
 
-function textWidth(text: string, scale: number): number {
-  return [...text].length * ADVANCE * scale
+function textWidth(text: string, scale: number, adv = ADVANCE): number {
+  return [...text].length * adv * scale
 }
 
 /** $0.00 — the same plain decimals the ESC/POS side prints, no peso glyph. */
 const two = (n: number): string => n.toFixed(2)
 
+export interface RasterizeOptions {
+  /**
+   * Render at half scale. The atlas is a fixed bitmap, so a graphic-mode
+   * printer can only print smaller by resampling its glyphs — there is no
+   * Font-B equivalent to select.
+   */
+  compact?: boolean
+}
+
 /**
  * Renders rows onto the canvas. Returns the flat image buffer the MXW01
  * driver wants: 48 bytes per line, top row first, bit 0 = leftmost pixel.
  */
-export function rasterize(rows: readonly RasterRow[], widthPixels = WIDTH_PIXELS): Uint8Array {
-  const lead = minimumLeading()
+export function rasterize(
+  rows: readonly RasterRow[],
+  widthPixels = WIDTH_PIXELS,
+  opts: RasterizeOptions = {},
+): Uint8Array {
+  const compact = opts.compact === true
+  const factor = compact ? COMPACT_FACTOR : 1
+  const adv = advanceFor(factor)
+  const drawWidth = cellWidthFor(factor)
+  const glyphBaseline = baselineFor(factor)
+  const lead = compact ? compactLeading(factor) : minimumLeading()
   const canvas = new Canvas(widthPixels)
   const contentW = widthPixels - MARGIN * 2
 
@@ -94,22 +125,23 @@ export function rasterize(rows: readonly RasterRow[], widthPixels = WIDTH_PIXELS
     scale: number,
     bold: boolean,
   ): void => {
-    const y0 = baselineY - BASELINE * scale
+    const y0 = baselineY - glyphBaseline * scale
     for (const ch of fold(text)) {
       let rows: number[] = glyph(ch)
+      if (factor > 1) rows = downsample(rows, drawWidth * factor, factor).rows
       if (bold) rows = embolden(rows)
-      canvas.drawGlyph(rows, x, y0, scale, ADVANCE)
-      x += ADVANCE * scale
+      canvas.drawGlyph(rows, x, y0, scale, drawWidth)
+      x += adv * scale
     }
   }
 
   const textLines = (text: string, scale: number): string[] => {
-    const budget = Math.floor(contentW / (ADVANCE * scale))
+    const budget = Math.floor(contentW / (adv * scale))
     return fold(text).length > budget ? wrap(text, budget) : [fold(text)]
   }
 
   const xFor = (line: string, align: string | undefined, scale: number): number => {
-    const w = textWidth(line, scale)
+    const w = textWidth(line, scale, adv)
     const x =
       align === 'center'
         ? MARGIN + (contentW - w) / 2
@@ -136,14 +168,14 @@ export function rasterize(rows: readonly RasterRow[], widthPixels = WIDTH_PIXELS
       const left = row.cells.find((c) => c.align === 'left')
       const right = row.cells.find((c) => c.align === 'right')
       if (left && right) {
-        const lw = textWidth(fold(left.text), scale)
-        const rw = textWidth(fold(right.text), scale)
+        const lw = textWidth(fold(left.text), scale, adv)
+        const rw = textWidth(fold(right.text), scale, adv)
         if (lw + rw <= contentW) {
           put(left.text, MARGIN, baseline, scale, row.bold === true)
           put(right.text, widthPixels - MARGIN - rw, baseline, scale, row.bold === true)
           baseline += lead * scale
         } else {
-          const budget = Math.max(1, Math.floor(contentW / (ADVANCE * scale)))
+          const budget = Math.max(1, Math.floor(contentW / (adv * scale)))
           const leftLines = wrap(left.text, budget)
           for (let i = 0; i < leftLines.length; i++) {
             put(leftLines[i], MARGIN, baseline + i * lead * scale, scale, row.bold === true)
@@ -189,7 +221,11 @@ export function buildRasterReceipt(order: Order, opts: RasterComposeOptions): Ui
   const layout = { ...DEFAULT_RECEIPT_LAYOUT, ...opts.layout }
   const { widthPixels = WIDTH_PIXELS } = opts
   const rows: RasterRow[] = []
-  const budget = Math.floor((widthPixels - MARGIN * 2) / ADVANCE)
+  // The two smallest sizes print at the atlas's native floor, so honour them by
+  // resampling the glyphs to half scale — the raster equivalent of ESC/POS Font B.
+  const compact = receiptFontPlan(layout.fontSize).fontB
+  const adv = advanceFor(compact ? COMPACT_FACTOR : 1)
+  const budget = Math.floor((widthPixels - MARGIN * 2) / adv)
   const headerBudget = layout.headerStyle === 'compact' ? budget : Math.floor(budget / 2)
   const scale: 1 | 2 = layout.headerStyle === 'compact' ? 1 : 2
   // The raster font only has 1x and 2x steps, so any size at or above the
@@ -289,7 +325,7 @@ export function buildRasterReceipt(order: Order, opts: RasterComposeOptions): Ui
     rows.push({ text: layout.footerText.trim(), align: 'center', scale: bodyScale })
   }
 
-  return rasterize(rows, widthPixels)
+  return rasterize(rows, widthPixels, { compact })
 }
 
 /** Self-test page for the printer settings card — graphic-mode equivalent. */
@@ -298,7 +334,9 @@ export function buildRasterTest(
   widthPixels = WIDTH_PIXELS,
   layout?: ReceiptLayout,
 ): Uint8Array {
-  const bodyScale: 1 | 2 = receiptFontStep({ ...DEFAULT_RECEIPT_LAYOUT, ...layout }.fontSize) >= 2 ? 2 : 1
+  const merged = { ...DEFAULT_RECEIPT_LAYOUT, ...layout }
+  const compact = receiptFontPlan(merged.fontSize).fontB
+  const bodyScale: 1 | 2 = receiptFontStep(merged.fontSize) >= 2 ? 2 : 1
   const rows: RasterRow[] = [
     { text: 'SELF TEST', align: 'center', bold: true, scale: 2 },
     { rule: 'dash' },
@@ -318,5 +356,5 @@ export function buildRasterTest(
       scale: bodyScale,
     },
   ]
-  return rasterize(rows, widthPixels)
+  return rasterize(rows, widthPixels, { compact })
 }

@@ -371,7 +371,10 @@ export class WebBleTransport implements PrinterTransport {
           })
         },
       }
-      this.mxwSession = new Mxw01PrintSession(link)
+      this.mxwSession = new Mxw01PrintSession(link, {
+        // Advisory (non-blocking) printer diagnostics — surfaced, never fatal.
+        onWarning: (message) => console.warn('[printer]', message),
+      })
       this.mode = 'graphic'
       this.startKeepalive()
       return true

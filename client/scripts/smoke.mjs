@@ -146,7 +146,6 @@ try {
   // 14b. POS settings → printer card renders with real capability notice
   await page.goto(BASE + '/pos/settings', { waitUntil: 'networkidle' })
   await page.waitForSelector('text=Receipt printer', { timeout: 10000 })
-  await page.waitForSelector('text=Auto-print receipts')
   await page.waitForSelector('text=Paper width')
   await page.waitForSelector('text=Receipt layout')
   await page.waitForSelector('text=Footer message')

@@ -24,12 +24,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { DataPagination } from '@/components/common/data-pagination'
 import { EmptyState } from '@/components/common/empty-state'
 import { peso } from '@/lib/format'
 import { productImage } from '@/lib/mock-image'
 import { formatQty } from '@/lib/units'
 import { getCategories, deleteProduct, getProducts } from '@/lib/repos'
 import type { Product } from '@/lib/types'
+import { usePagination } from '@/hooks/use-pagination'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 import { AdjustStockDialog } from './adjust-stock-dialog'
@@ -65,6 +67,16 @@ export function InventoryPage() {
     return () => window.removeEventListener('cpos:data-changed', handler)
   }, [refresh])
 
+  const filtered = (products ?? []).filter((p) => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
+  })
+  const totalValue = (products ?? []).reduce((s, p) => s + p.price * p.stock, 0)
+  const lowCount = (products ?? []).filter((p) => p.stock <= 10).length
+  // A new search term restarts at page 1; a data refresh does not move the page.
+  const pagination = usePagination(filtered, { resetKey: query })
+
   if (!store) {
     return (
       <div className="w-full p-4 sm:p-6">
@@ -81,14 +93,6 @@ export function InventoryPage() {
       </div>
     )
   }
-
-  const filtered = (products ?? []).filter((p) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
-  })
-  const totalValue = (products ?? []).reduce((s, p) => s + p.price * p.stock, 0)
-  const lowCount = (products ?? []).filter((p) => p.stock <= 10).length
 
   return (
     <div className="w-full space-y-4 p-4 sm:p-6">
@@ -153,83 +157,96 @@ export function InventoryPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="hidden sm:table-cell">SKU</TableHead>
-                <TableHead className="hidden md:table-cell">Category</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <span className="flex items-center gap-2.5">
-                      <img
-                        src={p.image || productImage(p.name, p.emoji)}
-                        alt=""
-                        className="size-9 shrink-0 rounded-lg border object-cover"
-                        loading="lazy"
-                      />
-                      <span>
-                        <span className="block font-medium">{p.name}</span>
-                        <span className="block text-xs text-muted-foreground sm:hidden">{p.sku}</span>
-                      </span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden font-mono text-xs text-muted-foreground sm:table-cell">
-                    {p.sku}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge variant="secondary">{p.category}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{peso(p.price)}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={p.stock === 0 ? 'destructive' : p.stock <= 10 ? 'outline' : 'secondary'} className="tabular-nums">
-                      {formatQty(p.stock, p.unit)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setAdjusting(p)}
-                        aria-label={`Adjust stock for ${p.name}`}
-                      >
-                        <PackagePlus className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => {
-                          setEditing(p)
-                          setDialogOpen(true)
-                        }}
-                        aria-label={`Edit ${p.name}`}
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleting(p)}
-                        aria-label={`Delete ${p.name}`}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        <div className="rounded-xl border bg-card">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="hidden sm:table-cell">SKU</TableHead>
+                  <TableHead className="hidden md:table-cell">Category</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {pagination.pageItems.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <span className="flex items-center gap-2.5">
+                        <img
+                          src={p.image || productImage(p.name, p.emoji)}
+                          alt=""
+                          className="size-9 shrink-0 rounded-lg border object-cover"
+                          loading="lazy"
+                        />
+                        <span>
+                          <span className="block font-medium">{p.name}</span>
+                          <span className="block text-xs text-muted-foreground sm:hidden">{p.sku}</span>
+                        </span>
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden font-mono text-xs text-muted-foreground sm:table-cell">
+                      {p.sku}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant="secondary">{p.category}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{peso(p.price)}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={p.stock === 0 ? 'destructive' : p.stock <= 10 ? 'outline' : 'secondary'} className="tabular-nums">
+                        {formatQty(p.stock, p.unit)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => setAdjusting(p)}
+                          aria-label={`Adjust stock for ${p.name}`}
+                        >
+                          <PackagePlus className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => {
+                            setEditing(p)
+                            setDialogOpen(true)
+                          }}
+                          aria-label={`Edit ${p.name}`}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleting(p)}
+                          aria-label={`Delete ${p.name}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DataPagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            from={pagination.from}
+            to={pagination.to}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            itemLabel="products"
+          />
         </div>
       )}
 

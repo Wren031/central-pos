@@ -8,8 +8,29 @@
 
 export type PaperWidth = 58 | 80
 
-/** Character columns per line for Font A (12x24). */
+/** The two built-in ESC/POS character fonts. */
+export type CharFont = 'a' | 'b'
+
+/**
+ * Dot cell per character, per font. These are the fixed built-in sizes —
+ * ESC/POS cannot print a font smaller than Font B, and `GS !` / `ESC !` only
+ * *magnify* (1x–8x); there is no sub-native size.
+ */
+export const FONT_CELL: Record<CharFont, { width: number; height: number }> = {
+  a: { width: 12, height: 24 },
+  b: { width: 9, height: 17 },
+}
+
+/** Character columns per line: Font A (12x24). */
 export const PAPER_COLS: Record<PaperWidth, number> = { 58: 32, 80: 48 }
+
+/** Character columns per line: Font B (9x17) — narrower cells, more fit. */
+export const PAPER_COLS_FONT_B: Record<PaperWidth, number> = { 58: 42, 80: 64 }
+
+/** Columns that fit on `width` in the given font (Font A is 12 dots, B is 9). */
+export function columnsFor(width: PaperWidth, font: CharFont): number {
+  return font === 'b' ? PAPER_COLS_FONT_B[width] : PAPER_COLS[width]
+}
 
 const ESC = 0x1b
 const GS = 0x1d
@@ -18,8 +39,12 @@ const NUL = 0x00
 
 export class EscPos {
   private bytes: number[] = []
-  /** Tracked emphasis state so ESC ! (which owns the emphasis bit) stays in sync. */
+  /** Tracked print-mode state: ESC ! (which owns the font bit) is always
+   *  rebuilt from these, so no command can silently reset the font or size. */
   private boldOn = false
+  private fontBOn = false
+  private widthMul = 1
+  private heightMul = 1
 
   private push(...vals: number[]): void {
     for (const v of vals) this.bytes.push(v & 0xff)
@@ -28,6 +53,9 @@ export class EscPos {
   /** ESC @ — initialize printer (clears buffer, resets modes). */
   init(): this {
     this.boldOn = false
+    this.fontBOn = false
+    this.widthMul = 1
+    this.heightMul = 1
     this.push(ESC, 0x40)
     return this
   }
@@ -38,7 +66,10 @@ export class EscPos {
     return this
   }
 
-  /** ESC E n — bold: 0=off, 1=on. */
+  /**
+   * ESC E n — bold: 0=off, 1=on. Bold is also mirrored into the ESC ! mode
+   * byte by applyMode() so the two commands never disagree.
+   */
   bold(on: boolean): this {
     this.boldOn = on
     this.push(ESC, 0x45, on ? 1 : 0)
@@ -46,7 +77,23 @@ export class EscPos {
   }
 
   /**
-   * ESC ! + GS ! — character size.
+   * Select the built-in character font.
+   *
+   * Font A (12x24) is the default and the larger of the two; Font B (9x17) is
+   * the smallest size a thermal printer can produce — there is no ESC/POS
+   * command for anything smaller. Emitted as ESC M n *and* mirrored into the
+   * ESC ! font bit (bit 0), because budget BLE printers differ in which one
+   * they honor; applyMode() keeps the pair consistent.
+   */
+  fontB(on: boolean): this {
+    this.fontBOn = on
+    this.push(ESC, 0x4d, on ? 1 : 0)
+    this.applyMode()
+    return this
+  }
+
+  /**
+   * ESC ! + GS ! — character magnification.
    *
    * GS ! n is the modern command: bits 4-6 select width magnification, bits 0-2
    * height (n = (width-1)<<4 | (height-1); 0x10 = double width, 0x11 = double
@@ -56,14 +103,25 @@ export class EscPos {
    * command wins, and when GS ! is ignored ESC ! still applies.
    */
   size(n: number): this {
-    const width = ((n >> 4) & 0x07) + 1
-    const height = (n & 0x07) + 1
-    let mode = this.boldOn ? 0x08 : 0x00
-    if (width > 1) mode |= 0x20
-    if (height > 1) mode |= 0x10
-    this.push(ESC, 0x21, mode)
-    this.push(GS, 0x21, n)
+    this.widthMul = ((n >> 4) & 0x07) + 1
+    this.heightMul = (n & 0x07) + 1
+    this.applyMode()
     return this
+  }
+
+  /**
+   * Re-emit the full current print mode as a paired ESC ! / GS ! block. Every
+   * command that changes the mode goes through here, so the font bit, emphasis,
+   * and magnification can never be set by one command and stale in another.
+   */
+  private applyMode(): void {
+    let esc = this.boldOn ? 0x08 : 0x00
+    if (this.fontBOn) esc |= 0x01
+    if (this.widthMul > 1) esc |= 0x20
+    if (this.heightMul > 1) esc |= 0x10
+    const gs = (((this.widthMul - 1) & 0x07) << 4) | ((this.heightMul - 1) & 0x07)
+    this.push(ESC, 0x21, esc)
+    this.push(GS, 0x21, gs)
   }
 
   /** LF — line feed. */

@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { DataPagination } from '@/components/common/data-pagination'
 import { EmptyState } from '@/components/common/empty-state'
 import { formatDateTime, peso } from '@/lib/format'
 import { DATE_RANGE_DEFAULT, rangeCutoff, type DateRange } from '@/lib/date-range'
@@ -34,6 +35,7 @@ import { mockClock } from '@/lib/mock-clock'
 import { formatQty } from '@/lib/units'
 import { getOrders, setOrderPaymentStatus } from '@/lib/repos'
 import type { Order } from '@/lib/types'
+import { usePagination } from '@/hooks/use-pagination'
 import { useAuth } from '@/state/auth-context'
 import { DateRangeSelect } from './date-range-select'
 import { ReceiptDialog } from './receipt-dialog'
@@ -61,6 +63,23 @@ export function OrdersPage() {
     return () => window.removeEventListener('cpos:data-changed', handler)
   }, [refresh])
 
+  const cutoff = rangeCutoff(range, mockClock.now())
+  const inRange = (orders ?? []).filter((o) => new Date(o.createdAt).getTime() >= cutoff)
+  const filtered = inRange.filter((o) => {
+    if (status !== 'all' && o.paymentStatus !== status) return false
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    return (
+      o.receiptNo.toLowerCase().includes(q) ||
+      o.items.some((it) => it.name.toLowerCase().includes(q))
+    )
+  })
+
+  const totalSales = inRange.filter((o) => o.paymentStatus === 'paid').reduce((s, o) => s + o.total, 0)
+  const unpaidCount = inRange.filter((o) => o.paymentStatus === 'unpaid').length
+  // Changing any filter restarts at page 1; a data refresh leaves the page alone.
+  const pagination = usePagination(filtered, { resetKey: `${query}|${status}|${range}` })
+
   if (!store) {
     return (
       <div className="w-full p-4 sm:p-6">
@@ -77,21 +96,6 @@ export function OrdersPage() {
       </div>
     )
   }
-
-  const cutoff = rangeCutoff(range, mockClock.now())
-  const inRange = (orders ?? []).filter((o) => new Date(o.createdAt).getTime() >= cutoff)
-  const filtered = inRange.filter((o) => {
-    if (status !== 'all' && o.paymentStatus !== status) return false
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      o.receiptNo.toLowerCase().includes(q) ||
-      o.items.some((it) => it.name.toLowerCase().includes(q))
-    )
-  })
-
-  const totalSales = inRange.filter((o) => o.paymentStatus === 'paid').reduce((s, o) => s + o.total, 0)
-  const unpaidCount = inRange.filter((o) => o.paymentStatus === 'unpaid').length
 
   async function togglePaid(order: Order) {
     const next = order.paymentStatus === 'paid' ? 'unpaid' : 'paid'
@@ -157,56 +161,69 @@ export function OrdersPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Receipt</TableHead>
-                <TableHead className="hidden sm:table-cell">Date</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-mono text-xs font-medium">{o.receiptNo}</TableCell>
-                  <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
-                    {formatDateTime(o.createdAt)}
-                  </TableCell>
-                  <TableCell className="max-w-40 truncate text-sm">
-                    {o.items.map((it) => `${it.name} ×${formatQty(it.qty, it.unit)}`).join(', ')}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{peso(o.total)}</TableCell>
-                  <TableCell>
-                    <Badge variant={o.paymentStatus === 'paid' ? 'outline' : 'destructive'}>
-                      {o.paymentStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon-xs" onClick={() => setDetail(o)} aria-label={`View ${o.receiptNo}`}>
-                        <Eye className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => {
-                          setReceipt(o)
-                          setReceiptOpen(true)
-                        }}
-                        aria-label={`Receipt for ${o.receiptNo}`}
-                      >
-                        <ReceiptText className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        <div className="rounded-xl border bg-card">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Receipt</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {pagination.pageItems.map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-mono text-xs font-medium">{o.receiptNo}</TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+                      {formatDateTime(o.createdAt)}
+                    </TableCell>
+                    <TableCell className="max-w-40 truncate text-sm">
+                      {o.items.map((it) => `${it.name} ×${formatQty(it.qty, it.unit)}`).join(', ')}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{peso(o.total)}</TableCell>
+                    <TableCell>
+                      <Badge variant={o.paymentStatus === 'paid' ? 'outline' : 'destructive'}>
+                        {o.paymentStatus}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon-xs" onClick={() => setDetail(o)} aria-label={`View ${o.receiptNo}`}>
+                          <Eye className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => {
+                            setReceipt(o)
+                            setReceiptOpen(true)
+                          }}
+                          aria-label={`Receipt for ${o.receiptNo}`}
+                        >
+                          <ReceiptText className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DataPagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            from={pagination.from}
+            to={pagination.to}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            itemLabel="orders"
+          />
         </div>
       )}
 

@@ -1,11 +1,10 @@
-import { EscPos, PAPER_COLS, type PaperWidth } from './escpos'
+import { EscPos, PAPER_COLS, columnsFor, type PaperWidth } from './escpos'
 import { formatDateTime } from '../format'
 import { unitLabel } from '../units'
 import {
   DEFAULT_RECEIPT_LAYOUT,
-  receiptFontStep,
+  receiptFontPlan,
   type Order,
-  type ReceiptFontPrintStep,
   type ReceiptLayout,
 } from '../types'
 
@@ -21,11 +20,9 @@ const PAYMENT_LABEL: Record<Order['paymentStatus'], string> = {
   unpaid: 'UNPAID',
 }
 
-/** GS ! n flags per print step: 0x00 native, 0x10 double width, 0x11 double both. */
-const STEP_FLAG: Record<ReceiptFontPrintStep, { flag: number; widthMul: 1 | 2 }> = {
-  1: { flag: 0x00, widthMul: 1 },
-  2: { flag: 0x10, widthMul: 2 },
-  3: { flag: 0x11, widthMul: 2 },
+/** Magnification factor implied by a GS ! / ESC ! flag (0x10 / 0x11 double the width). */
+function widthFactor(flag: number): 1 | 2 {
+  return flag === 0x00 ? 1 : 2
 }
 
 /**
@@ -34,25 +31,28 @@ const STEP_FLAG: Record<ReceiptFontPrintStep, { flag: number; widthMul: 1 | 2 }>
  */
 export function buildReceipt(order: Order, opts: ReceiptOptions): Uint8Array {
   const layout = { ...DEFAULT_RECEIPT_LAYOUT, ...opts.layout }
-  const font = STEP_FLAG[receiptFontStep(layout.fontSize)]
-  // Double-width characters halve the usable columns — recompute every row.
-  const paperCols = PAPER_COLS[opts.paperWidth ?? 80]
-  const cols = Math.floor(paperCols / font.widthMul)
-  // The full header prints at double size, so it keeps its own half-width
-  // budget no matter what body font size is selected.
-  const headerCols = Math.floor(paperCols / 2)
+  const plan = receiptFontPlan(layout.fontSize)
+  const width = opts.paperWidth ?? 80
+  // Body columns follow the font actually selected — Font B is narrower (9 vs
+  // 12 dots), so it fits more characters per line. Using Font A columns with
+  // Font B would leave the ticket short of the paper edge.
+  const cols = Math.floor(columnsFor(width, plan.fontB ? 'b' : 'a') / widthFactor(plan.flag))
+  // The header is always Font A, so it keeps its own Font-A width budget.
+  const fontACols = PAPER_COLS[width]
+  const headerCols = Math.floor(fontACols / 2)
   const maxName = Math.max(8, Math.min(24, cols - 10))
   const p = new EscPos()
+  const compact = layout.headerStyle === 'compact'
 
   p.init()
-  p.size(font.flag)
 
-  // Header — store identity, centered; full style is double-size + bold.
-  const compact = layout.headerStyle === 'compact'
+  // Header — Font A so the store name stays the visual anchor.
+  p.fontB(false)
   p.align(1)
   if (!compact) p.bold(true).size(0x11)
-  p.text(opts.storeName.toUpperCase().slice(0, compact ? cols : headerCols))
-  if (!compact) p.size(font.flag).bold(false)
+  p.text(opts.storeName.toUpperCase().slice(0, compact ? fontACols : headerCols))
+  // Body — switch to the configured font + magnification before any body text.
+  p.bold(false).fontB(plan.fontB).size(plan.flag)
   if (layout.showAddress && opts.storeAddress) {
     p.align(1).text(opts.storeAddress.slice(0, cols))
   }
@@ -115,12 +115,13 @@ export function buildTestReceipt(
   layout?: ReceiptLayout,
 ): Uint8Array {
   const merged = { ...DEFAULT_RECEIPT_LAYOUT, ...layout }
-  const font = STEP_FLAG[receiptFontStep(merged.fontSize)]
-  const cols = Math.floor(PAPER_COLS[paperWidth] / font.widthMul)
+  const plan = receiptFontPlan(merged.fontSize)
+  const cols = Math.floor(columnsFor(paperWidth, plan.fontB ? 'b' : 'a') / widthFactor(plan.flag))
   const p = new EscPos()
   p.init()
-  p.size(font.flag)
-  p.align(1).bold(true).size(0x11).text('SELF TEST').size(font.flag).bold(false)
+  // Title in Font A double-size, body in the configured font — same as a receipt.
+  p.fontB(false).align(1).bold(true).size(0x11).text('SELF TEST')
+  p.bold(false).fontB(plan.fontB).size(plan.flag)
   p.dashLine(cols)
   p.text(storeName.slice(0, cols))
   p.text(`Date: ${formatDateTime(new Date().toISOString())}`.slice(0, cols))

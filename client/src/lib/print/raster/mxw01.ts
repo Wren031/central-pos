@@ -68,6 +68,13 @@ const NOTIFY_TIMEOUT_MS = 4000
 const PRINT_BASE_TIMEOUT_MS = 8000
 const PRINT_MS_PER_LINE = 70
 
+// A single status read cannot be trusted. The reference measured the head
+// temperature still climbing for a second or two AFTER a print ended (a reading
+// of 39 became 46), and a slow reply can also be read as the answer to the next
+// question. So a flag seen once is not proof of a fault: re-read before refusing.
+const STATUS_READ_ATTEMPTS = 3
+const STATUS_RETRY_MS = 400
+
 // --- notifications ----------------------------------------------------------
 
 /**
@@ -110,7 +117,27 @@ export class NoPaper extends PrinterError {}
 /** The head is too hot to start. Wait; do not print. */
 export class TooHot extends PrinterError {}
 
+/**
+ * Error-flag bits that are REPORTED but not verified as faults.
+ *
+ * The reference protocol doc (09-protocol.md) is explicit that it never
+ * decoded what the error flag means: `0x01` is the ONLY non-zero value ever
+ * observed there, and "the drivers here refuse to print on any non-zero value".
+ * On the unit this was debugged against, `0x01` (bit 0) is steady-state — it
+ * survives re-reads while the head sits at 28 °C, the printer is idle, and the
+ * paper byte reads loaded, i.e. nothing corroborates a fault.
+ *
+ * So bit 0 is treated as advisory: surfaced as a warning, never a refusal.
+ * Any OTHER bit is a value nobody has ever observed and stays a hard refusal.
+ */
+const ADVISORY_ERROR_BITS = 0x01
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** The raw status bytes as lowercase hex — always carried in errors. */
+function statusHex(status: Mxw01Status): string {
+  return [...status.raw].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 // --- link -----------------------------------------------------------
 
@@ -142,16 +169,27 @@ export interface Mxw01Status {
   raw: Uint8Array
 }
 
+export interface Mxw01SessionOptions {
+  /** Non-fatal diagnostics (e.g. an advisory error-flag bit). Default: no-op. */
+  onWarning?: (message: string) => void
+}
+
 export class Mxw01PrintSession {
   readonly link: Mxw01Link
   private waiters = new Map<number, (payload: Uint8Array) => void>()
+  private readonly onWarning: (message: string) => void
+  /** True while a ticket is in flight — the keepalive must not cut in. */
+  private busy = false
   lastPrintAt = 0
   lastSentLines = 0
+  /** Set when the last print carried an advisory (non-blocking) error flag. */
+  lastAdvisory: string | null = null
   private lastStalls = 0
   private lastPaceMs = PACE_MS
 
-  constructor(link: Mxw01Link) {
+  constructor(link: Mxw01Link, options: Mxw01SessionOptions = {}) {
     this.link = link
+    this.onWarning = options.onWarning ?? (() => {})
     link.onNotification((bytes) => {
       const parsed = parseNotification(bytes)
       if (!parsed) return
@@ -222,14 +260,36 @@ export class Mxw01PrintSession {
   /** A keepalive: one status read resets the printer's sleep timer. */
   async keepalive(): Promise<Mxw01Status | null> {
     if (!this.link.isConnected()) return null
+    // Never poll while a ticket is in flight. The status reply and a print's
+    // own status reply are both A1 — a keepalive landing mid-print steals the
+    // answer the print is waiting for and desyncs every later command/answer
+    // pair, which is exactly how a stale or wrong status gets read.
+    if (this.busy) return null
     return await this.status()
   }
 
   /**
    * Prints one bitmap and verifies the printer echoed the exact image checksum.
    * `resume` lets the transport silently re-open a dropped GATT connection.
+   *
+   * Serialised: a second call while a ticket is in flight is refused rather
+   * than interleaved on the same control pipe.
    */
   async print(
+    lines: Uint8Array,
+    options: { intensity?: number; feedLines?: number; maxTempC?: number } = {},
+    resume?: () => Promise<void>,
+  ): Promise<Mxw01PrintResult> {
+    if (this.busy) throw new PrinterError('a ticket is already being printed')
+    this.busy = true
+    try {
+      return await this.runPrint(lines, options, resume)
+    } finally {
+      this.busy = false
+    }
+  }
+
+  private async runPrint(
     lines: Uint8Array,
     options: { intensity?: number; feedLines?: number; maxTempC?: number } = {},
     resume?: () => Promise<void>,
@@ -261,19 +321,53 @@ export class Mxw01PrintSession {
     const since = Date.now() - this.lastPrintAt
     if (this.lastPrintAt && since < MIN_PRINT_GAP_MS) await sleep(MIN_PRINT_GAP_MS - since)
 
-    const status = await this.status()
+    let status = await this.status()
     if (!status) throw new PrinterError('the printer did not answer a status request')
 
     // Paper BEFORE the error flag, and the order is the point: an empty roll
     // also raises the flag, so checking the flag first means the paper byte is
     // never read — and this is the failure that would silently destroy a job.
     if (!status.paperOk) {
-      const hex = [...status.raw].map((b) => b.toString(16).padStart(2, '0')).join('')
-      throw new NoPaper(`the roll is empty (status ${hex})`)
+      throw new NoPaper(`the roll is empty (status ${statusHex(status)})`)
     }
-    if (status.errorFlag !== 0) {
-      const hex = [...status.raw].map((b) => b.toString(16).padStart(2, '0')).join('')
-      throw new PrinterError(`printer error flag 0x${status.errorFlag.toString(16)} (${hex})`)
+
+    // Only genuinely anomalous bits justify a refusal, so re-read while one is
+    // set: a lagging reply can carry a stale flag. Advisory bits are ignored
+    // here — they are reported below, never used to refuse.
+    const blockingBits = (s: Mxw01Status) => s.errorFlag & ~ADVISORY_ERROR_BITS
+    for (let attempt = 1; blockingBits(status) !== 0 && attempt < STATUS_READ_ATTEMPTS; attempt++) {
+      await sleep(STATUS_RETRY_MS)
+      const retry = await this.status()
+      if (!retry) break
+      status = retry
+      if (!status.paperOk) {
+        throw new NoPaper(`the roll is empty (status ${statusHex(status)})`)
+      }
+    }
+
+    const blocking = blockingBits(status)
+    const advisory = status.errorFlag & ADVISORY_ERROR_BITS
+    this.lastAdvisory = null
+
+    if (blocking !== 0) {
+      throw new PrinterError(
+        `printer error flag 0x${status.errorFlag.toString(16).padStart(2, '0')} ` +
+          `(unrecognised bits 0x${blocking.toString(16).padStart(2, '0')}) — ` +
+          `state ${status.state}, supply ${status.supply}, ${status.temperature} C, ` +
+          `paper ${status.paperOk ? 'ok' : 'empty'} (status ${statusHex(status)}). ` +
+          `Re-read ${STATUS_READ_ATTEMPTS}x and it did not clear. ` +
+          `Check the roll and that the lid is closed, then power-cycle the printer.`,
+      )
+    }
+
+    // Advisory: bit 0 is reported by healthy units too (see ADVISORY_ERROR_BITS)
+    // so it must not block. Say so plainly rather than swallowing it.
+    if (advisory !== 0) {
+      this.lastAdvisory =
+        `Printer reports error flag 0x${status.errorFlag.toString(16).padStart(2, '0')} ` +
+        `(${status.temperature} C, supply ${status.supply}, status ${statusHex(status)}). ` +
+        `Not a verified fault — printing anyway.`
+      this.onWarning(this.lastAdvisory)
     }
     const ceiling = Math.min(maxTempC, MAX_HEAD_C)
     if (status.temperature > ceiling) {

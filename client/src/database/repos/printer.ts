@@ -18,7 +18,6 @@ export interface PrinterState {
   devices: PrinterDevice[]
   connected: PrinterDevice | null
   printing: boolean
-  autoPrint: boolean
   paperWidth: 58 | 80
   layout: ReceiptLayout
   savedDevice: PrinterDevice | null
@@ -36,7 +35,6 @@ let state: PrinterState = {
   devices: [],
   connected: null,
   printing: false,
-  autoPrint: false,
   paperWidth: 80,
   layout: { ...DEFAULT_RECEIPT_LAYOUT },
   savedDevice: null,
@@ -74,7 +72,6 @@ async function persist(): Promise<void> {
     deviceId: state.connected?.id ?? state.savedDevice?.id ?? null,
     deviceName: state.connected?.name ?? state.savedDevice?.name ?? null,
     protocol: state.connected?.protocol ?? state.savedDevice?.protocol ?? null,
-    autoPrint: state.autoPrint,
     paperWidth: state.paperWidth,
     layout: { ...state.layout },
     updatedAt: mockClock.nowIso(),
@@ -119,14 +116,13 @@ export const printerService = {
           : null
         patch({
           savedDevice: device,
-          autoPrint: saved.autoPrint,
           paperWidth: saved.paperWidth,
           layout: { ...DEFAULT_RECEIPT_LAYOUT, ...saved.layout },
           // Bluetooth links do not survive page reloads — saved ≠ connected.
           connected: null,
         })
       } else {
-        patch({ savedDevice: null, autoPrint: false, paperWidth: 80, layout: { ...DEFAULT_RECEIPT_LAYOUT } })
+        patch({ savedDevice: null, paperWidth: 80, layout: { ...DEFAULT_RECEIPT_LAYOUT } })
       }
     } catch (err) {
       setError(err)
@@ -180,11 +176,6 @@ export const printerService = {
     await persist()
   },
 
-  async setAutoPrint(on: boolean): Promise<void> {
-    patch({ autoPrint: on })
-    await persist()
-  },
-
   async setPaperWidth(width: 58 | 80): Promise<void> {
     patch({ paperWidth: width })
     await persist()
@@ -224,9 +215,7 @@ export const printerService = {
    * Print an order receipt. Returns true only if the hardware accepted the job.
    * Callers must surface failures — never assume success.
    *
-   * Prints whenever a printer is connected; the auto-print preference is gated
-   * at the auto-print call site, so a manual "Print receipt" action (reprint)
-   * works even when auto-print is off.
+   * Prints whenever a printer is connected; there is no auto-print preference.
    */
   async printOrder(order: Order, store: Store): Promise<boolean> {
     if (!state.connected) return false

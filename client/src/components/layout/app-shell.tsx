@@ -380,8 +380,8 @@ export function AppShell() {
     setMobileOpen(false)
   }, [location.pathname])
 
-  // Load saved printer settings as soon as a store exists, so auto-print
-  // works after a reload without visiting Settings first.
+  // Load saved printer settings as soon as a store exists, so the receipt
+  // printer is ready after a reload without visiting Settings first.
   React.useEffect(() => {
     if (store?.id) void printerService.init(store.id)
   }, [store?.id])

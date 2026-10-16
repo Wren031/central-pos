@@ -91,3 +91,78 @@ export function fold(text: string): string {
 export function embolden(rows: readonly number[]): number[] {
   return rows.map((mask) => mask | (mask << 1))
 }
+
+/**
+ * Downscale factor for the "compact" raster type size. The atlas is a fixed
+ * bitmap (17 px pitch, 35 px tall), so the only way to print smaller on a
+ * graphic-mode printer is to resample the glyphs — there is no smaller font to
+ * select, unlike ESC/POS Font B.
+ */
+export const COMPACT_FACTOR = 2
+
+/** Pen advance (px) for a given downscale factor — 1 leaves the atlas native. */
+export function advanceFor(factor = 1): number {
+  return factor > 1 ? Math.ceil(ADVANCE / factor) : ADVANCE
+}
+
+/** Ink-box width (px) for a given downscale factor. */
+export function cellWidthFor(factor = 1): number {
+  return factor > 1 ? Math.ceil(CELL_WIDTH / factor) : CELL_WIDTH
+}
+
+/** Baseline offset (px) for a given downscale factor. */
+export function baselineFor(factor = 1): number {
+  return factor > 1 ? Math.floor(BASELINE / factor) : BASELINE
+}
+
+/**
+ * Resample a glyph's row bitmasks down by an integer factor, OR-ing each
+ * source block. OR (not decimation) is deliberate: it never drops a stroke, so
+ * thin 1-px stems survive the shrink instead of vanishing.
+ */
+export function downsample(
+  rows: readonly number[],
+  width = CELL_WIDTH,
+  factor = COMPACT_FACTOR,
+): { rows: number[]; width: number } {
+  if (factor <= 1) return { rows: [...rows], width }
+  const outWidth = Math.ceil(width / factor)
+  const out: number[] = []
+  for (let y = 0; y < rows.length; y += factor) {
+    let acc = 0
+    for (let dy = 0; dy < factor && y + dy < rows.length; dy++) {
+      const mask = rows[y + dy]
+      if (!mask) continue
+      for (let x = 0; x < width; x++) {
+        if (mask & (1 << x)) acc |= 1 << Math.floor(x / factor)
+      }
+    }
+    out.push(acc)
+  }
+  return { rows: out, width: outWidth }
+}
+
+/**
+ * The tightest baseline-to-baseline spacing for downsampled glyphs. Measured on
+ * the resampled bitmaps themselves (not divided from the full-size value) so
+ * lines can never overlap in compact mode.
+ */
+export function compactLeading(factor = COMPACT_FACTOR): number {
+  let lowest = 0
+  let highest = HEIGHT
+  const scan = (text: string, fn: (y: number) => void) => {
+    for (const ch of text) {
+      const src = rowsFor(ch.codePointAt(0) as number)
+      if (!src) continue
+      const { rows } = downsample(src, CELL_WIDTH, factor)
+      for (let y = 0; y < rows.length; y++) if (rows[y]) fn(y)
+    }
+  }
+  scan(DESCENDERS, (y) => {
+    if (y > lowest) lowest = y
+  })
+  scan(RISERS, (y) => {
+    if (y < highest) highest = y
+  })
+  return lowest - highest + 1
+}

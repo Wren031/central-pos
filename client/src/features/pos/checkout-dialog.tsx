@@ -203,31 +203,10 @@ export function CheckoutDialog({
 
       // Same dialog, only the footer buttons change: the cashier now sees
       // "Print receipt" / "Complete order" instead of "Complete sale". The cart
-      // is cleared when the sale is finished (see handleOpenChange).
+      // is cleared when the sale is finished (see handleOpenChange). Printing is
+      // manual — see printReceipt().
       setCompletedOrder(order)
       setProcessing(false)
-
-      // Auto-print over Bluetooth when enabled and a printer is really connected.
-      // Fire-and-forget: the toast below reports the hardware result, never a fake success.
-      const ps = printerService.getState()
-      if (ps.autoPrint) {
-        if (ps.connected) {
-          void printerService
-            .printOrder(order, store)
-            .then((printed) => {
-              if (printed) {
-                toast.info(`Receipt sent to ${printerService.getState().connected?.name ?? 'printer'}`)
-              }
-            })
-            .catch((err) => {
-              toast.error(err instanceof Error ? err.message : 'Printing failed.')
-            })
-        } else {
-          toast.info('Auto-print is on, but no printer is connected.', {
-            description: 'Connect a Bluetooth printer in POS settings to print receipts automatically.',
-          })
-        }
-      }
     } catch (err) {
       if (err instanceof InsufficientStockError) {
         toast.error(err.message, { description: 'Stock was not changed — adjust inventory and try again.' })
