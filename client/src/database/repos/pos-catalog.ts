@@ -41,6 +41,7 @@ function toDef(rec: PosTypeRecord): PosTypeDef {
     icon: iconForName(rec.icon),
     theme: themeForId(rec.id),
     categories: getPosTypeCategories(rec.id).map((c) => c.name),
+    barcodeEnabled: rec.barcodeEnabled === true,
   }
 }
 
@@ -65,6 +66,7 @@ export function getPosType(id: string): PosTypeDef {
     icon: iconForName(null),
     theme: themeForId(id),
     categories: [],
+    barcodeEnabled: false,
   }
 }
 

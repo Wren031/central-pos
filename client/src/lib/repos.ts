@@ -32,6 +32,7 @@ export {
   deleteProduct,
   adjustStock,
   getProductMovements,
+  findProductByBarcode,
 } from '@/database/repos/products'
 
 export {
@@ -77,6 +78,8 @@ export { getCustomers, addCustomer, updateCustomer, deleteCustomer } from '@/dat
 export { getCategories, addCategory } from '@/database/repos/categories'
 export { printerService } from '@/database/repos/printer'
 export type { PrinterState } from '@/database/repos/printer'
+export { scannerService } from '@/database/repos/scanner'
+export type { ScannerState } from '@/database/repos/scanner'
 
 /**
  * Legacy no-op kept for import compatibility.

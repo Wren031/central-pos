@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Pencil, Plus, Power, RotateCw, Tags } from 'lucide-react'
+import { Loader2, Pencil, Plus, Power, RotateCw, ScanBarcode, Tags } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAsync } from '@/hooks/use-async'
@@ -32,6 +32,7 @@ interface PosTypeForm {
   icon: string
   sort_order: number
   active: boolean
+  barcode_enabled: boolean
 }
 
 const EMPTY_FORM: PosTypeForm = {
@@ -42,6 +43,7 @@ const EMPTY_FORM: PosTypeForm = {
   icon: 'Store',
   sort_order: 0,
   active: true,
+  barcode_enabled: false,
 }
 
 export function PosTypesPage() {
@@ -86,6 +88,7 @@ export function PosTypesPage() {
         icon: t.icon ?? 'Store',
         sort_order: t.sort_order,
         active: t.active,
+        barcode_enabled: t.barcode_enabled ?? false,
       },
     })
   }
@@ -124,6 +127,7 @@ export function PosTypesPage() {
         icon: form.icon,
         sort_order: form.sort_order,
         active: form.active,
+        barcode_enabled: form.barcode_enabled,
       }
       const { error } =
         mode === 'create'
@@ -206,6 +210,12 @@ export function PosTypesPage() {
                       <Tags className="size-3" aria-hidden />
                       {categoryCounts[t.id] ?? 0} categor{categoryCounts[t.id] === 1 ? 'y' : 'ies'}
                     </span>
+                    {t.barcode_enabled && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium leading-none text-violet-700">
+                        <ScanBarcode className="size-3" aria-hidden />
+                        Barcode
+                      </span>
+                    )}
                   </div>
                 </div>
                 <p className="mt-3 line-clamp-3 min-h-[3rem] text-sm text-muted-foreground">
@@ -356,6 +366,25 @@ export function PosTypesPage() {
                 />
                 <span className="text-sm font-medium">Active (available to new stores)</span>
               </label>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3.5">
+              <div className="flex items-start gap-3">
+                <ScanBarcode className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <div>
+                  <p className="text-sm font-medium">Barcode scanner</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Lets this POS type scan product barcodes with a camera or USB scanner. Off = all
+                    barcode features stay hidden in the client POS.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                size="sm"
+                checked={editing.form.barcode_enabled}
+                onCheckedChange={(checked) =>
+                  setEditing({ ...editing, form: { ...editing.form, barcode_enabled: checked } })
+                }
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setEditing(null)} disabled={busy}>

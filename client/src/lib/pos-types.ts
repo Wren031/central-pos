@@ -26,6 +26,8 @@ export interface PosTypeDef {
   theme: PosTheme
   /** Category names assigned to this POS type (from Supabase). */
   categories: string[]
+  /** Admin-controlled: whether barcode scanning is offered for this POS type. */
+  barcodeEnabled: boolean
 }
 
 export {

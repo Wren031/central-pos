@@ -8,10 +8,12 @@ import {
   Minimize2,
   Minus,
   Plus,
+  ScanLine,
   Search,
   ShoppingCart,
   Trash2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -24,12 +26,14 @@ import { formatDateTime, peso } from '@/lib/format'
 import { productImage } from '@/lib/mock-image'
 import { formatQty, unitLabel } from '@/lib/units'
 import { getPosType } from '@/lib/pos-types'
-import { getCategories, getOrders, getProducts } from '@/lib/repos'
+import { getCategories, getOrders, getProducts, findProductByBarcode } from '@/lib/repos'
+import { useScannerSettings } from '@/hooks/use-scanner-settings'
 import { cn } from '@/lib/utils'
 import type { Order, Product } from '@/lib/types'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 import { useCart } from './cart-context'
+import { CameraScannerDialog } from './camera-scanner-dialog'
 import { CheckoutDialog } from './checkout-dialog'
 import { ReceiptDialog } from './receipt-dialog'
 
@@ -122,6 +126,10 @@ export function CatalogPage() {
   const { user, store } = useAuth()
   const { state } = useSubscription()
   const { add, count, subtotal } = useCart()
+  const scanner = useScannerSettings(store?.id)
+  const posDef = store ? getPosType(store.posType) : null
+  const barcodeEnabled = posDef?.barcodeEnabled ?? false
+  const locked = !state.canSell
   const [products, setProducts] = React.useState<Product[] | null>(null)
   const [query, setQuery] = React.useState('')
   const [category, setCategory] = React.useState<string>('All')
@@ -130,6 +138,7 @@ export function CatalogPage() {
   const [receiptOpen, setReceiptOpen] = React.useState(false)
   const [cartOpen, setCartOpen] = React.useState(false)
   const [gridMax, setGridMax] = React.useState(false)
+  const [scanOpen, setScanOpen] = React.useState(false)
 
   React.useEffect(() => {
     const root = document.documentElement
@@ -160,7 +169,6 @@ export function CatalogPage() {
     return () => window.removeEventListener('cpos:data-changed', handler)
   }, [refreshProducts])
 
-  const posDef = store ? getPosType(store.posType) : null
   // Categories come from the store's (Supabase-derived) category config.
   const categories = store ? ['All', ...getCategories(store.id).map((c) => c.name)] : ['All']
 
@@ -173,10 +181,88 @@ export function CatalogPage() {
       return (
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        p.category.toLowerCase().includes(q) ||
+        (p.barcode?.toLowerCase().includes(q) ?? false)
       )
     })
   }, [products, query, category])
+
+  // Debounce repeated detections of the same code — the camera fires a callback
+  // on every decoded frame while a barcode stays in view.
+  const lastScanRef = React.useRef<{ code: string; at: number }>({ code: '', at: 0 })
+
+  const handleScan = React.useCallback(
+    (raw: string): boolean => {
+      if (!store) return false
+      const code = raw.trim()
+      if (!code) return false
+      const now = Date.now()
+      if (lastScanRef.current.code === code && now - lastScanRef.current.at < 1200) return false
+      lastScanRef.current = { code, at: now }
+
+      const product = findProductByBarcode(store.id, code)
+      if (!product) {
+        toast.error(`Barcode not registered: ${code}`, {
+          description: 'Add this barcode to a product in Inventory.',
+        })
+        return false
+      }
+      if (locked) {
+        toast.error('Selling is locked. Renew your subscription to add items.')
+        return false
+      }
+      if (product.stock <= 0) {
+        toast.error(`${product.name} is out of stock.`)
+        return false
+      }
+      add(product)
+      toast.success(`Added ${product.name}`)
+      return true
+    },
+    [store, locked, add]
+  )
+
+  // USB scanners emulate a keyboard: they type the barcode then press Enter.
+  // Capture that keystroke stream globally, but never while typing in a field.
+  React.useEffect(() => {
+    if (!barcodeEnabled || scanner.mode !== 'usb' || locked) return
+    let buffer = ''
+    let lastAt = 0
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          target.isContentEditable
+        ) {
+          return
+        }
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const now = Date.now()
+      if (now - lastAt > 500) buffer = ''
+      lastAt = now
+      if (e.key === 'Enter') {
+        const code = buffer.trim()
+        buffer = ''
+        if (code) {
+          e.preventDefault()
+          handleScan(code)
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        buffer = ''
+        return
+      }
+      if (e.key.length === 1) buffer += e.key
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [barcodeEnabled, scanner.mode, locked, handleScan])
 
   if (!store || !posDef) {
     return (
@@ -194,8 +280,6 @@ export function CatalogPage() {
       </div>
     )
   }
-
-  const locked = !state.canSell
 
   return (
     <div className="-mb-20 flex h-full min-h-0 flex-col p-4 pb-24 sm:p-6 md:-mb-6 md:pb-6">
@@ -217,6 +301,24 @@ export function CatalogPage() {
               aria-label="Search products"
             />
           </div>
+          {barcodeEnabled && scanner.mode === 'camera' && (
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => setScanOpen(true)}
+              aria-label="Scan a barcode with the camera"
+            >
+              <ScanLine className="size-4" />
+              Scan
+            </Button>
+          )}
+          {barcodeEnabled && scanner.mode === 'usb' && (
+            <span className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground sm:flex">
+              <ScanLine className="size-4" aria-hidden />
+              USB scanner ready
+            </span>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -410,6 +512,10 @@ export function CatalogPage() {
       </div>
 
       <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} />
+
+      {barcodeEnabled && scanner.mode === 'camera' && (
+        <CameraScannerDialog open={scanOpen} onOpenChange={setScanOpen} onDetect={handleScan} />
+      )}
 
       <ReceiptDialog
         order={lastOrder}

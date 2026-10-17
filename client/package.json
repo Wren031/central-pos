@@ -15,6 +15,7 @@
     "test:remember-me": "node scripts/remember-me-test.mjs",
     "test:register-flow": "node scripts/register-flow-test.mjs",
     "test:product-image": "node scripts/product-image-test.mjs",
+    "test:camera": "node scripts/camera-scanner-test.mjs",
     "test:pagination": "node scripts/pagination-test.mjs",
     "test:escpos": "node scripts/print-escpos-test.mjs",
     "test:raster": "node scripts/print-raster-test.mjs"
@@ -26,6 +27,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@supabase/supabase-js": "^2.117.3",
     "@tailwindcss/vite": "^4.3.3",
+    "@zxing/browser": "^0.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.4.0",
@@ -52,6 +54,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.6",
     "electron": "^44.7.0",

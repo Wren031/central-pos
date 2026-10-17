@@ -31,6 +31,8 @@ export interface PosType {
   icon: string | null
   category: string | null
   active: boolean
+  /** Admin-controlled: whether the client POS offers barcode scanning. */
+  barcode_enabled: boolean
   sort_order: number
   created_at: string
   updated_at: string

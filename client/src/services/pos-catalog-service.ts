@@ -26,6 +26,7 @@ interface PosTypeRow {
   icon: string | null
   category: string | null
   active: boolean
+  barcode_enabled: boolean | null
   sort_order: number | null
 }
 
@@ -106,6 +107,7 @@ export async function refreshPosCatalog(): Promise<boolean> {
       icon: t.icon ?? null,
       category: t.category ?? null,
       active: t.active,
+      barcodeEnabled: t.barcode_enabled === true,
       sortOrder: t.sort_order ?? 0,
       fetchedAt,
     }))

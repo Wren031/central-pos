@@ -14,6 +14,7 @@ import type {
   PosCategoryRecord,
   PrinterSettings,
   Product,
+  ScannerSettings,
   SessionRow,
   StockMovement,
   Store,
@@ -46,6 +47,7 @@ export class CposDatabase extends Dexie {
   syncQueue!: EntityTable<SyncOperation, 'id'>
   syncMeta!: EntityTable<SyncMetaRow, 'key'>
   printerSettings!: EntityTable<PrinterSettings, 'storeId'>
+  scannerSettings!: EntityTable<ScannerSettings, 'storeId'>
 
   constructor() {
     super('central-pos')
@@ -79,6 +81,11 @@ export class CposDatabase extends Dexie {
     })
     this.version(5).stores({
       planCatalog: 'id, active, sortOrder',
+    })
+    this.version(6).stores({
+      // `barcode` index powers fast offline lookup on the Sell screen.
+      products: 'id, storeId, sku, barcode, category, [storeId+category], active, createdAt',
+      scannerSettings: 'storeId',
     })
   }
 }

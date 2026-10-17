@@ -14,6 +14,7 @@ import { InventoryPage } from '@/features/pos/inventory-page'
 import { OrdersPage } from '@/features/pos/orders-page'
 import { PosOverviewPage } from '@/features/pos/pos-overview-page'
 import { PosSettingsPage } from '@/features/pos/pos-settings-page'
+import { ScannerPage } from '@/features/pos/scanner-page'
 import { ReportsPage } from '@/features/pos/reports-page'
 import { ProfilePage } from '@/features/profile/profile-page'
 import { CartProvider } from '@/features/pos/cart-context'
@@ -86,6 +87,7 @@ export default function App() {
                       <Route path="/pos/orders" element={<OrdersPage />} />
                       <Route path="/pos/reports" element={<ReportsPage />} />
                       <Route path="/pos/settings" element={<PosSettingsPage />} />
+                      <Route path="/pos/scanner" element={<ScannerPage />} />
                     </Route>
                     <Route path="/home" element={<Navigate to="/" replace />} />
                     <Route path="*" element={<NotFoundPage />} />

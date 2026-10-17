@@ -143,6 +143,8 @@ export interface Product {
   storeId: string
   name: string
   sku: string
+  /** Optional EAN/UPC/code the POS scanner matches at checkout (admin-gated per POS type). */
+  barcode?: string
   category: string
   price: number
   stock: number
@@ -333,6 +335,8 @@ export interface PosTypeRecord {
   icon: string | null
   category: string | null
   active: boolean
+  /** Admin-controlled: whether the POS for this type offers barcode scanning. */
+  barcodeEnabled: boolean
   sortOrder: number
   fetchedAt: string
 }
@@ -468,6 +472,21 @@ export interface PrinterSettings {
   protocol: PrinterProtocol | null
   paperWidth: 58 | 80
   layout: ReceiptLayout
+  updatedAt: string
+}
+
+/** How the cashier scans barcodes at checkout. */
+export type ScannerMode = 'camera' | 'usb'
+
+/**
+ * Locally-persisted scanner preference for a store. Scanning is either a camera
+ * (software decode via @zxing/browser) or a keyboard-emulating USB device; the
+ * mode only changes how the POS captures input, so it lives in Dexie and works
+ * fully offline. The admin POS-type flag decides whether scanning exists at all.
+ */
+export interface ScannerSettings {
+  storeId: string
+  mode: ScannerMode
   updatedAt: string
 }
 

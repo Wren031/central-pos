@@ -39,6 +39,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Camera barcode scanner (getUserMedia from the WebView needs the runtime
+         CAMERA permission declared here, or Capacitor's WebChromeClient denies
+         the WebView's VIDEO_CAPTURE request and the camera never opens). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <!-- Bluetooth thermal printer support.
          Classic SPP + BLE on all supported API levels. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />

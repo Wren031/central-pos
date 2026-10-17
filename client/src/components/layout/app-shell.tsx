@@ -12,6 +12,7 @@ import {
   Menu,
   Package,
   ReceiptText,
+  ScanBarcode,
   ScrollText,
   Settings,
   Store as StoreIcon,
@@ -66,6 +67,22 @@ const POS_NAV: NavItem[] = [
   { id: 'pos-reports', to: '/pos/reports', label: 'Reports', icon: ChartNoAxesColumnIncreasing },
   { id: 'pos-settings', to: '/pos/settings', label: 'Settings', icon: Settings },
 ]
+
+/**
+ * Scanner settings link — shown ONLY when the store's POS type has barcode
+ * scanning enabled by an admin (the client cannot turn it on itself).
+ */
+const SCANNER_NAV: NavItem = {
+  id: 'pos-scanner',
+  to: '/pos/scanner',
+  label: 'Scanner',
+  icon: ScanBarcode,
+}
+
+/** POS-type sub-nav, with the Scanner entry appended when barcode is enabled. */
+function posNavItems(barcodeEnabled: boolean): NavItem[] {
+  return barcodeEnabled ? [...POS_NAV, SCANNER_NAV] : POS_NAV
+}
 
 /** Does `pathname` fall on this target — exactly, or under it as a sub-path? */
 function underNavPath(pathname: string, to: string, end?: boolean) {
@@ -126,6 +143,7 @@ function NavItems({
   onActivate: (id: string) => void
 }) {
   const { store } = useAuth()
+  const posNav = posNavItems(store ? getPosType(store.posType).barcodeEnabled : false)
 
   const renderItem = (item: NavItem) => {
     const isActive = item.id === activeId
@@ -157,7 +175,7 @@ function NavItems({
           <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             {getPosType(store.posType).name}
           </p>
-          {POS_NAV.map(renderItem)}
+          {posNav.map(renderItem)}
         </>
       )}
     </nav>
@@ -359,9 +377,10 @@ export function AppShell() {
   const accent = posDef?.theme.accent
 
   // Every nav target the sidebar can show, in display order.
+  const barcodeEnabled = posDef?.barcodeEnabled ?? false
   const navItems = React.useMemo(
-    () => (store?.onboarded ? [...MAIN_NAV, ...POS_NAV] : MAIN_NAV),
-    [store?.onboarded]
+    () => (store?.onboarded ? [...MAIN_NAV, ...posNavItems(barcodeEnabled)] : MAIN_NAV),
+    [store?.onboarded, barcodeEnabled]
   )
 
   // The item the user last pressed. Kept separate from the route so the two

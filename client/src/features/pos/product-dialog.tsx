@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ImagePlus, Loader2, X } from 'lucide-react'
+import { ImagePlus, Loader2, ScanBarcode, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils'
 
 const schema = z.object({
   name: z.string().min(2, 'Product name is required.'),
+  barcode: z.string(),
   category: z.string().min(1, 'Pick a category.'),
   price: z.number().min(0.01, 'Price must be greater than 0.'),
   stock: z.number().int('Stock must be a whole number.').min(0, 'Cannot be negative.'),
@@ -60,6 +61,7 @@ export function ProductDialog({
   product,
   categories,
   storeId,
+  barcodeEnabled = false,
   onSaved,
 }: {
   open: boolean
@@ -67,12 +69,15 @@ export function ProductDialog({
   product: Product | null
   categories: string[]
   storeId: string
+  /** Admin-controlled: show the barcode field for this store's POS type. */
+  barcodeEnabled?: boolean
   onSaved?: () => void
 }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',
+      barcode: '',
       category: '',
       price: 0,
       stock: 0,
@@ -101,6 +106,7 @@ export function ProductDialog({
     if (product) {
       form.reset({
         name: product.name,
+        barcode: product.barcode ?? '',
         category: product.category,
         price: product.price,
         stock: product.stock,
@@ -110,6 +116,7 @@ export function ProductDialog({
     } else {
       form.reset({
         name: '',
+        barcode: '',
         category: categoriesRef.current[0] ?? '',
         price: 0,
         stock: 0,
@@ -158,11 +165,23 @@ export function ProductDialog({
 
   async function onSubmit(values: FormValues) {
     try {
+      const { barcode, ...rest } = values
       if (product) {
-        await updateProduct(product.id, { ...values, image: values.image || undefined })
+        await updateProduct(product.id, {
+          ...rest,
+          // Only touch the stored barcode when barcode scanning is enabled for
+          // this POS type — otherwise preserve whatever was saved before.
+          ...(barcodeEnabled ? { barcode } : {}),
+          image: values.image || undefined,
+        })
         toast.success('Product updated')
       } else {
-        await addProduct(storeId, { ...values, emoji: '📦', image: values.image || undefined })
+        await addProduct(storeId, {
+          ...rest,
+          ...(barcodeEnabled ? { barcode } : {}),
+          emoji: '📦',
+          image: values.image || undefined,
+        })
         toast.success('Product added')
       }
       onSaved?.()
@@ -300,6 +319,35 @@ export function ProductDialog({
                     </FormItem>
                   )}
                 />
+                {barcodeEnabled && (
+                  <FormField
+                    control={form.control}
+                    name="barcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Barcode</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <ScanBarcode
+                              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                              aria-hidden
+                            />
+                            <Input
+                              placeholder="Scan or type the barcode"
+                              className="pl-9 font-mono"
+                              autoComplete="off"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <p className="text-[11px] text-muted-foreground">
+                          Unique per store — this is what the POS scanner matches at checkout.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="category"

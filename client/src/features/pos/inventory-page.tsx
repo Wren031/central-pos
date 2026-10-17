@@ -30,6 +30,7 @@ import { peso } from '@/lib/format'
 import { productImage } from '@/lib/mock-image'
 import { formatQty } from '@/lib/units'
 import { getCategories, deleteProduct, getProducts } from '@/lib/repos'
+import { getPosType } from '@/lib/pos-types'
 import type { Product } from '@/lib/types'
 import { usePagination } from '@/hooks/use-pagination'
 import { useAuth } from '@/state/auth-context'
@@ -67,10 +68,17 @@ export function InventoryPage() {
     return () => window.removeEventListener('cpos:data-changed', handler)
   }, [refresh])
 
+  const barcodeEnabled = store ? getPosType(store.posType).barcodeEnabled : false
+
   const filtered = (products ?? []).filter((p) => {
     const q = query.trim().toLowerCase()
     if (!q) return true
-    return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q) ||
+      (p.barcode?.toLowerCase().includes(q) ?? false)
+    )
   })
   const totalValue = (products ?? []).reduce((s, p) => s + p.price * p.stock, 0)
   const lowCount = (products ?? []).filter((p) => p.stock <= 10).length
@@ -164,6 +172,9 @@ export function InventoryPage() {
                 <TableRow>
                   <TableHead>Product</TableHead>
                   <TableHead className="hidden sm:table-cell">SKU</TableHead>
+                  {barcodeEnabled && (
+                    <TableHead className="hidden lg:table-cell">Barcode</TableHead>
+                  )}
                   <TableHead className="hidden md:table-cell">Category</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
@@ -184,12 +195,22 @@ export function InventoryPage() {
                         <span>
                           <span className="block font-medium">{p.name}</span>
                           <span className="block text-xs text-muted-foreground sm:hidden">{p.sku}</span>
+                          {barcodeEnabled && p.barcode && (
+                            <span className="block font-mono text-[11px] text-muted-foreground lg:hidden">
+                              {p.barcode}
+                            </span>
+                          )}
                         </span>
                       </span>
                     </TableCell>
                     <TableCell className="hidden font-mono text-xs text-muted-foreground sm:table-cell">
                       {p.sku}
                     </TableCell>
+                    {barcodeEnabled && (
+                      <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
+                        {p.barcode || '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="hidden md:table-cell">
                       <Badge variant="secondary">{p.category}</Badge>
                     </TableCell>
@@ -262,6 +283,7 @@ export function InventoryPage() {
         product={editing}
         categories={categories}
         storeId={store.id}
+        barcodeEnabled={barcodeEnabled}
         onSaved={refresh}
       />
 
