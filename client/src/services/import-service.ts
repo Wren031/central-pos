@@ -2,37 +2,79 @@ import { z } from 'zod'
 import { db } from '@/database/schema'
 import { refreshCacheForUser } from '@/database/db'
 import { EXPORT_VERSION } from './export-service'
+import type {
+  Category,
+  Customer,
+  Order,
+  OrderItemRecord,
+  PrinterSettings,
+  Product,
+  ScannerSettings,
+  StockMovement,
+  Store,
+  Subscription,
+  Transaction,
+} from '@/lib/types'
 
 const record = z.looseObject({})
 
 const payloadSchema = z.object({
+  app: z.literal('central-pos'),
   version: z.literal(EXPORT_VERSION),
   exportedAt: z.string(),
-  app: z.literal('central-pos'),
+  accountEmail: z.string(),
+  store: z.object({
+    name: z.string(),
+    posType: z.string().min(1),
+  }),
   data: z.object({
-    users: z.array(record),
-    stores: z.array(record),
-    subscriptions: z.array(record),
-    products: z.array(record),
     categories: z.array(record),
+    products: z.array(record),
+    stockMovements: z.array(record),
     customers: z.array(record),
     orders: z.array(record),
     orderItems: z.array(record),
     transactions: z.array(record),
-    notifications: z.array(record),
-    stockMovements: z.array(record),
+    subscriptions: z.array(record),
   }),
+  settings: z
+    .object({
+      printer: record.nullable().optional(),
+      scanner: record.nullable().optional(),
+    })
+    .optional(),
 })
 
 export interface ImportResult {
+  /** Rows newly written, per table. */
   restored: Record<string, number>
+  /** Rows skipped because the same id already exists locally. */
+  skipped: Record<string, number>
+  /** The POS type recorded in the backup. */
+  sourcePosType: string
+  /** True when the backup came from a different account email. */
+  differentAccount: boolean
 }
 
 /**
- * Validates and restores an export into IndexedDB.
- * Replaces existing rows per table; sessions and sync queue are untouched.
+ * Which tables the import may touch. NOTE: users, sessions, pending
+ * registrations, the sync queue, and password hashes are deliberately absent —
+ * a backup must never create or overwrite an account, nor restore credentials.
  */
-export async function importDatabase(json: string): Promise<ImportResult> {
+const IMPORT_TABLES = [
+  db.categories,
+  db.products,
+  db.stockMovements,
+  db.customers,
+  db.orders,
+  db.orderItems,
+  db.transactions,
+  db.subscriptions,
+  db.printerSettings,
+  db.scannerSettings,
+] as const
+
+function parseBackup(json: string) {
   let parsed: unknown
   try {
     parsed = JSON.parse(json)
@@ -41,67 +83,173 @@ export async function importDatabase(json: string): Promise<ImportResult> {
   }
   const result = payloadSchema.safeParse(parsed)
   if (!result.success) {
-    throw new Error('That file is not a valid UniPOS backup.')
+    throw new Error(
+      'That file is not a valid UniPOS backup (or it was made by an older version). Export a fresh backup and try again.'
+    )
   }
-  const data = result.data.data
-  // Restore passwordHash-less users with a legacy placeholder hash — the
-  // demo account is re-seeded on next boot anyway; restored users must
-  // reset via demo login or register fresh. Keep a note on the record.
-  const users = data.users.map((u) => ({
-    ...u,
-    passwordHash: (u as { passwordHash?: string }).passwordHash ?? 'imported-locked',
-  }))
-  await db.transaction(
-    'rw',
-    [
-      db.users,
-      db.stores,
-      db.subscriptions,
-      db.products,
-      db.categories,
-      db.customers,
-      db.orders,
-      db.orderItems,
-      db.transactions,
-      db.notifications,
-      db.stockMovements,
-    ],
-    async () => {
-      await db.users.clear()
-      await db.stores.clear()
-      await db.subscriptions.clear()
-      await db.products.clear()
-      await db.categories.clear()
-      await db.customers.clear()
-      await db.orders.clear()
-      await db.orderItems.clear()
-      await db.transactions.clear()
-      await db.notifications.clear()
-      await db.stockMovements.clear()
-      await db.users.bulkPut(users as never[])
-      await db.stores.bulkPut(data.stores as never[])
-      await db.subscriptions.bulkPut(data.subscriptions as never[])
-      await db.products.bulkPut(data.products as never[])
-      await db.categories.bulkPut(data.categories as never[])
-      await db.customers.bulkPut(data.customers as never[])
-      await db.orders.bulkPut(data.orders as never[])
-      await db.orderItems.bulkPut(data.orderItems as never[])
-      await db.transactions.bulkPut(data.transactions as never[])
-      await db.notifications.bulkPut(data.notifications as never[])
-      await db.stockMovements.bulkPut(data.stockMovements as never[])
+  return result.data
+}
+
+/**
+ * Merge a v2 backup into the CURRENT account + store.
+ *
+ * Guarantees:
+ *   * Never clears or deletes existing rows.
+ *   * Dedupes by primary key — a record already on this device is skipped.
+ *   * Re-points ownership: every row is reassigned to the signed-in user and
+ *     THIS device's store, so a backup can't attach data to a stale store id.
+ *   * Runs in one Dexie transaction: either the merge lands or nothing changes.
+ *   * Never restores users/passwords/tokens/sessions.
+ */
+export async function importDatabase(
+  json: string,
+  target: { userId: string; store: Store; email: string }
+): Promise<ImportResult> {
+  const backup = parseBackup(json)
+  const storeId = target.store.id
+  const userId = target.userId
+
+  const restored: Record<string, number> = {}
+  const skipped: Record<string, number> = {}
+
+  await db.transaction('rw', IMPORT_TABLES, async () => {
+    // Existing ids per table so re-importing the same file is a no-op.
+    const existingIds = async (table: { toCollection: () => { primaryKeys: () => Promise<unknown[]> } }) => {
+      const keys = await table.toCollection().primaryKeys()
+      return new Set(keys.map((k) => String(k)))
     }
-  )
-  const session = await db.sessions.get('current')
-  if (session) await refreshCacheForUser(session.userId)
+
+    const take = <T>(
+      rows: unknown[],
+      ids: Set<string>,
+      table: string,
+      map: (row: Record<string, unknown>) => T
+    ): T[] => {
+      const out: T[] = []
+      let skip = 0
+      for (const raw of rows) {
+        if (!raw || typeof raw !== 'object') {
+          skip++
+          continue
+        }
+        const row = raw as Record<string, unknown>
+        const id = String(row.id ?? '')
+        if (!id || ids.has(id)) {
+          skip++
+          continue
+        }
+        out.push(map(row))
+      }
+      restored[table] = out.length
+      skipped[table] = skip
+      return out
+    }
+
+    const catIds = await existingIds(db.categories)
+    const prodIds = await existingIds(db.products)
+    const movIds = await existingIds(db.stockMovements)
+    const custIds = await existingIds(db.customers)
+    const orderIds = await existingIds(db.orders)
+    const itemIds = await existingIds(db.orderItems)
+    const txnIds = await existingIds(db.transactions)
+
+    const categories = take<Category>(backup.data.categories, catIds, 'categories', (r) => ({
+      ...r,
+      storeId,
+    }) as Category)
+    const products = take<Product>(backup.data.products, prodIds, 'products', (r) => ({
+      ...r,
+      storeId,
+    }) as Product)
+    const movements = take<StockMovement>(
+      backup.data.stockMovements,
+      movIds,
+      'stockMovements',
+      (r) => ({ ...r, storeId }) as StockMovement
+    )
+    const customers = take<Customer>(backup.data.customers, custIds, 'customers', (r) => ({
+      ...r,
+      storeId,
+    }) as Customer)
+    const orders = take<Order>(backup.data.orders, orderIds, 'orders', (r) => ({
+      ...r,
+      storeId,
+      userId,
+    }) as Order)
+    const orderItems = take<OrderItemRecord>(
+      backup.data.orderItems,
+      itemIds,
+      'orderItems',
+      (r) => ({ ...r, storeId }) as OrderItemRecord
+    )
+    const transactions = take<Transaction>(
+      backup.data.transactions,
+      txnIds,
+      'transactions',
+      (r) => ({ ...r, userId }) as Transaction
+    )
+
+    // A user has ONE local subscription. Never import one over an existing
+    // record (it would fight with the current plan/expiry).
+    const existingSub = await db.subscriptions.where('userId').equals(userId).first()
+    const subIds = await existingIds(db.subscriptions)
+    let subscriptions: Subscription[] = []
+    if (existingSub) {
+      restored.subscriptions = 0
+      skipped.subscriptions = backup.data.subscriptions.length
+    } else {
+      subscriptions = take<Subscription>(
+        backup.data.subscriptions,
+        subIds,
+        'subscriptions',
+        (r) => ({ ...r, userId }) as Subscription
+      )
+    }
+
+    if (categories.length) await db.categories.bulkPut(categories)
+    if (products.length) await db.products.bulkPut(products)
+    if (movements.length) await db.stockMovements.bulkPut(movements)
+    if (customers.length) await db.customers.bulkPut(customers)
+    if (orders.length) await db.orders.bulkPut(orders)
+    if (orderItems.length) await db.orderItems.bulkPut(orderItems)
+    if (transactions.length) await db.transactions.bulkPut(transactions)
+    if (subscriptions.length) await db.subscriptions.bulkPut(subscriptions)
+
+    // Device settings: fill in only when this device has none yet.
+    if (backup.settings?.printer) {
+      const existing = await db.printerSettings.get(storeId)
+      if (!existing) {
+        await db.printerSettings.put({
+          ...(backup.settings.printer as unknown as PrinterSettings),
+          storeId,
+        })
+        restored.printerSettings = 1
+      } else {
+        skipped.printerSettings = 1
+      }
+    }
+    if (backup.settings?.scanner) {
+      const existing = await db.scannerSettings.get(storeId)
+      if (!existing) {
+        await db.scannerSettings.put({
+          ...(backup.settings.scanner as unknown as ScannerSettings),
+          storeId,
+        })
+        restored.scannerSettings = 1
+      } else {
+        skipped.scannerSettings = 1
+      }
+    }
+  })
+
+  await refreshCacheForUser(userId)
+
   return {
-    restored: {
-      users: users.length,
-      stores: data.stores.length,
-      products: data.products.length,
-      orders: data.orders.length,
-      customers: data.customers.length,
-      transactions: data.transactions.length,
-    },
+    restored,
+    skipped,
+    sourcePosType: backup.store.posType,
+    differentAccount:
+      backup.accountEmail.trim().toLowerCase() !== target.email.trim().toLowerCase(),
   }
 }
 

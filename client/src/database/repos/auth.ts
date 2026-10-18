@@ -36,14 +36,29 @@ async function hashPasswordSafe(password: string): Promise<string> {
  * (link-confirmed) registration, which already has a precomputed password hash.
  * The plan duration is chosen next, on /onboarding.
  */
-async function createLocalAccount(input: {
-  fullName: string
-  address: string
-  contactNumber: string
-  businessName: string
-  email: string
-  passwordHash: string
-}): Promise<User> {
+async function createLocalAccount(
+  input: {
+    fullName: string
+    address: string
+    contactNumber: string
+    businessName: string
+    email: string
+    passwordHash: string
+  },
+  /**
+   * Optional subscription to mirror instead of the default 30-day trial. Used
+   * when an existing account is recovered on a new device: the cloud's plan and
+   * expiry must win so the device never grants a fresh trial by accident.
+   */
+  subscription?: {
+    plan: string
+    planName?: string
+    durationDays?: number
+    startedAt: string
+    expiresAt: string
+    pricePaid: number
+  }
+): Promise<User> {
   const email = input.email.trim().toLowerCase()
   const now = nowIso()
   const user: User = {
@@ -57,15 +72,27 @@ async function createLocalAccount(input: {
     notificationPrefs: { expiration: true, reminders: true, marketing: false },
     createdAt: now,
   }
-  const sub: Subscription = {
-    id: newId('sub'),
-    userId: user.id,
-    plan: 'trial',
-    startedAt: now,
-    expiresAt: new Date(mockClock.now().getTime() + 30 * 86400000).toISOString(),
-    pricePaid: 0,
-    active: true,
-  }
+  const sub: Subscription = subscription
+    ? {
+        id: newId('sub'),
+        userId: user.id,
+        plan: subscription.plan,
+        planName: subscription.planName,
+        durationDays: subscription.durationDays,
+        startedAt: subscription.startedAt,
+        expiresAt: subscription.expiresAt,
+        pricePaid: subscription.pricePaid,
+        active: true,
+      }
+    : {
+        id: newId('sub'),
+        userId: user.id,
+        plan: 'trial',
+        startedAt: now,
+        expiresAt: new Date(mockClock.now().getTime() + 30 * 86400000).toISOString(),
+        pricePaid: 0,
+        active: true,
+      }
   const notification = {
     id: newId('ntf'),
     userId: user.id,
@@ -105,6 +132,32 @@ export async function registerUser(input: {
   if (existing) throw new Error('An account with this email already exists.')
   const passwordHash = await hashPasswordSafe(input.password)
   return createLocalAccount({ ...input, email, passwordHash })
+}
+
+/**
+ * Recreates the LOCAL identity of an account that already exists in Supabase
+ * (verified email, no local record on this device). Unlike registerUser this
+ * creates NO store and NO forced trial when the server reports a subscription —
+ * the caller decides whether/how to restore the workspace.
+ */
+export async function createLocalAccountFromCloud(input: {
+  fullName: string
+  address: string
+  contactNumber: string
+  businessName: string
+  email: string
+  password: string
+  subscription?: {
+    plan: string
+    planName?: string
+    durationDays?: number
+    startedAt: string
+    expiresAt: string
+    pricePaid: number
+  }
+}): Promise<User> {
+  const passwordHash = await hashPasswordSafe(input.password)
+  return createLocalAccount({ ...input, passwordHash }, input.subscription)
 }
 
 /* ---------- pending (email-link) registrations ---------- */
@@ -423,6 +476,13 @@ export async function setupStore(userId: string, posType: PosTypeId): Promise<St
   const user = await db.users.get(userId)
   if (!user) throw new Error('User not found.')
   const existing = await db.stores.where('userId').equals(userId).first()
+  // The workspace type is assigned once. Re-running setup with a different type
+  // would silently change the account's POS and wipe its catalog — refuse it.
+  if (existing && existing.posType !== posType) {
+    throw new Error(
+      'This account already has a POS type. It cannot be changed here — contact an administrator.'
+    )
+  }
   let store: Store
   const now = nowIso()
   if (!existing) {
@@ -470,7 +530,77 @@ export async function setupStore(userId: string, posType: PosTypeId): Promise<St
 }
 
 export async function changePosType(userId: string, posType: PosTypeId): Promise<Store> {
+  // Guarded by setupStore: changing an existing workspace's POS type is refused.
   return setupStore(userId, posType)
+}
+
+/** True when this account already has a local workspace (store) on this device. */
+export async function hasLocalStore(userId: string): Promise<boolean> {
+  const store = await db.stores.where('userId').equals(userId).first()
+  return Boolean(store)
+}
+
+/**
+ * Restore the LOCAL workspace from the account's cloud configuration. Used when
+ * an existing account signs in on a device with no local data: the POS type is
+ * taken from the server and is never re-chosen by the user.
+ *
+ * Idempotent — if a store already exists it is returned unchanged (only a
+ * missing/blank name is filled in). Never deletes products or stock.
+ */
+export async function restoreStoreFromCloud(
+  userId: string,
+  cloud: { name: string; posType: PosTypeId }
+): Promise<Store> {
+  await latency(200)
+  const user = await db.users.get(userId)
+  if (!user) throw new Error('User not found.')
+
+  const existing = await db.stores.where('userId').equals(userId).first()
+  if (existing) {
+    if (!existing.name?.trim() && cloud.name.trim()) {
+      const renamed: Store = { ...existing, name: cloud.name.trim() }
+      await db.stores.put(renamed)
+      await refreshCacheForUser(userId)
+      return renamed
+    }
+    return existing
+  }
+
+  const now = nowIso()
+  const store: Store = {
+    id: newId('str'),
+    userId,
+    name: cloud.name.trim() || user.businessName,
+    posType: cloud.posType,
+    createdAt: now,
+    onboarded: true,
+  }
+  // Load the POS type's category configuration into the workspace (same source
+  // as setupStore). No products are created — the catalog stays empty until a
+  // backup is restored or items are added.
+  const assignedCategories = getPosTypeCategories(cloud.posType).map((c) => ({
+    id: c.categoryId,
+    storeId: store.id,
+    name: c.name,
+    createdAt: now,
+  }))
+
+  await db.transaction(
+    'rw',
+    [db.stores, db.categories, db.syncQueue],
+    async () => {
+      await db.stores.put(store)
+      if (assignedCategories.length > 0) {
+        await db.categories.bulkPut(assignedCategories)
+      }
+      await putSyncOp(
+        syncOpFor('store', store.id, 'create', store.id, { posType: cloud.posType })
+      )
+    }
+  )
+  await refreshCacheForUser(userId)
+  return store
 }
 
 export type { NotificationPrefs, Subscription }

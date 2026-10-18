@@ -1,57 +1,17 @@
 /**
  * Camera plumbing for the barcode scanner.
  *
- * Kept separate from the dialog so the capability checks, device enumeration,
- * constraint fallback, and error → message mapping are pure and testable — and
- * so the UI never shows a raw `TypeError: ... getUserMedia of undefined`.
+ * Kept separate from the dialog so device enumeration, constraint fallback, and
+ * error → message mapping are pure and testable.
  *
- * Root causes this guards against:
- *   * Insecure origin (plain http:// LAN URL): `navigator.mediaDevices` is
- *     undefined entirely, so any direct getUserMedia call throws a TypeError.
- *   * Device without a camera: `getUserMedia` rejects with NotFoundError.
- *   * Permission blocked / missing (notably the Android manifest): NotAllowedError.
+ * The camera is attempted directly — there is no pre-emptive "needs HTTPS or
+ * localhost" gate. If the browser can't provide a stream, the error is mapped to
+ * a clear message by `describeCameraError`.
  */
 
 export interface CameraDevice {
   deviceId: string
   label: string
-}
-
-/** Can this context even attempt getUserMedia? (secure context + API present) */
-export function isCameraSupported(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
-  if (!window.isSecureContext) return false
-  return typeof navigator.mediaDevices?.getUserMedia === 'function'
-}
-
-/** True only for the insecure-origin case (so we can show the specific fix). */
-export function isInsecureOrigin(): boolean {
-  if (typeof window === 'undefined') return false
-  return !window.isSecureContext
-}
-
-/** The current page origin, for a self-diagnosing message. */
-function currentOrigin(): string {
-  if (typeof window === 'undefined' || !window.location) return 'this address'
-  return window.location.origin
-}
-
-/**
- * Human-readable reason the camera can't be used at all, or null when it can.
- * Covers the two "before you even try" branches distinctly, and names the
- * actual origin so an insecure-origin block is self-explanatory.
- */
-export function cameraUnavailableReason(): string | null {
-  const origin = currentOrigin()
-  const insecureMessage =
-    `Camera access is blocked on ${origin} because it isn't a secure context. ` +
-    'Open the app over https:// (or http://localhost on the device) — browsers only allow the camera on secure origins.'
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-    if (isInsecureOrigin()) return insecureMessage
-    return 'This browser does not support camera access (no mediaDevices API).'
-  }
-  if (!isCameraSupported()) return insecureMessage
-  return null
 }
 
 /** Enumerate available video input devices (labels are blank until permission granted). */
@@ -94,8 +54,12 @@ function constraintCandidates(deviceId?: string | null): MediaStreamConstraints[
  * Throws the LAST error when every attempt fails (callers map it for display).
  */
 export async function openCameraStream(deviceId?: string | null): Promise<MediaStream> {
-  const reason = cameraUnavailableReason()
-  if (reason) throw new Error(reason)
+  // Attempt the camera directly. Only guard against the API being genuinely
+  // absent (old browsers / a context that exposes no mediaDevices) so the caller
+  // gets a readable message instead of a raw TypeError.
+  if (typeof navigator === 'undefined' || typeof navigator.mediaDevices?.getUserMedia !== 'function') {
+    throw new Error('Camera access is not available in this browser.')
+  }
 
   let lastError: unknown = null
   for (const constraints of constraintCandidates(deviceId)) {
@@ -135,8 +99,7 @@ export async function resolveInitialCamera(deviceId?: string | null): Promise<st
 /** Map a getUserMedia/Zxing failure to clear, actionable copy. */
 export function describeCameraError(err: unknown): string {
   const name = (err as { name?: string } | null)?.name ?? ''
-  // Our own thrown Error (insecure-origin / capability message) uses the default
-  // "Error" name and already reads well — surface it verbatim.
+  // A plain Error (no DOMException name) already carries a readable message.
   if (err instanceof Error && (name === '' || name === 'Error')) {
     return err.message
   }

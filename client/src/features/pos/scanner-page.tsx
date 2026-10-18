@@ -14,7 +14,6 @@ import {
 import { EmptyState } from '@/components/common/empty-state'
 import { PageHeader } from '@/components/common/page-header'
 import { scannerService } from '@/database/repos/scanner'
-import { cameraUnavailableReason } from '@/lib/camera'
 import { getPosType } from '@/lib/pos-types'
 import { useScannerSettings } from '@/hooks/use-scanner-settings'
 import { cn } from '@/lib/utils'
@@ -28,27 +27,23 @@ function ModeOption({
   title,
   description,
   onSelect,
-  disabled = false,
 }: {
   selected: boolean
   icon: React.ElementType
   title: string
   description: string
   onSelect: () => void
-  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={disabled}
       aria-pressed={selected}
       className={cn(
         'flex w-full items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all',
-        disabled && 'cursor-not-allowed opacity-60',
-        !disabled && selected
+        selected
           ? 'border-primary ring-2 ring-primary/30'
-          : !disabled && 'hover:border-foreground/20 hover:shadow-sm'
+          : 'hover:border-foreground/20 hover:shadow-sm'
       )}
     >
       <span
@@ -82,8 +77,6 @@ export function ScannerPage() {
   const [lastCode, setLastCode] = React.useState<string | null>(null)
 
   const posDef = store ? getPosType(store.posType) : null
-  // Static per mount: is a camera even usable in this context (secure + API)?
-  const cameraReason = React.useMemo(() => cameraUnavailableReason(), [])
 
   function choose(next: ScannerMode) {
     if (!store || next === mode) return
@@ -148,7 +141,6 @@ export function ScannerPage() {
             title="Camera scanner"
             description="Use this device’s camera to read barcodes. Works on phones, tablets, and laptops."
             onSelect={() => choose('camera')}
-            disabled={!!cameraReason}
           />
           <ModeOption
             selected={mode === 'usb'}
@@ -158,12 +150,6 @@ export function ScannerPage() {
             onSelect={() => choose('usb')}
           />
         </div>
-        {cameraReason && (
-          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            <span>{cameraReason}</span>
-          </p>
-        )}
       </div>
 
       {mode === 'usb' ? (
@@ -217,7 +203,6 @@ export function ScannerPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setTestOpen(true)}
-                disabled={!!cameraReason}
               >
                 <Camera className="size-4" />
                 Test camera

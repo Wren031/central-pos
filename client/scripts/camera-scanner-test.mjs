@@ -229,12 +229,16 @@ const browser = await chromium.launch({
   try {
     await boot(page, '/pos/scanner')
     await page.waitForSelector('text=Barcode scanner', { timeout: 20000 })
-    // The Camera option is disabled and a clear reason is shown up-front.
+    // The camera is not pre-blocked: the option stays selectable, and the dialog
+    // attempts getUserMedia, failing gracefully with a plain message.
     const cameraDisabled = await page.locator('button:has-text("Camera scanner")').isDisabled()
-    assert(cameraDisabled === true, 'T3 camera option disabled when mediaDevices is unavailable')
-    const warning = await page.locator('text=/camera access|camera needs a secure connection/i').count()
-    assert(warning > 0, 'T3 an explanatory warning is shown')
-    assert(pageErrors.length === 0, 'T3 no page errors (no TypeError leak)', pageErrors.join(' | '))
+    assert(cameraDisabled === false, 'T3 camera option is not pre-disabled')
+
+    await page.click('button:has-text("Test camera")')
+    await page.waitForSelector('video', { timeout: 15000 })
+    await page.waitForSelector('text=/Camera access is not available/i', { timeout: 15000 })
+    assert(true, 'T3 dialog reports the camera error gracefully')
+    assert(pageErrors.length === 0, 'T3 no page errors (no raw TypeError leak)', pageErrors.join(' | '))
   } catch (err) {
     fail('T3 unusable camera handled clearly', String(err))
   } finally {

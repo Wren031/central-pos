@@ -35,24 +35,45 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 
 The barcode scanner's camera mode uses `getUserMedia`, which browsers only allow
 on **secure contexts**: `https://` origins and `http://localhost` (plus the
-Capacitor app, which runs on `https://localhost`). On a plain-`http://` LAN
-address such as `http://192.168.1.20:5173`, the camera is blocked by the browser
-and the app shows a "not a secure context" message — USB barcode scanning still
-works there.
+Capacitor app, which runs on `https://localhost`). So the camera works when you
+run the dev server locally at `http://localhost:5173`.
 
-### Testing the camera on a phone/tablet (dev server)
+A plain-`http://` LAN address such as `http://192.168.1.20:5173` is **not** a
+secure context, so the browser blocks the camera there (USB barcode scanning
+still works). To use the camera from a phone/tablet, either:
 
-1. Add `VITE_DEV_HTTPS=1` to `client/.env.local`.
-2. Run `npm run dev` and open `https://<your-pc-ip>:5173` on the device.
-3. Accept the self-signed certificate warning once.
+- build and run the **Capacitor app** (secure local origin — no setup), or
+- serve the app over a **trusted HTTPS tunnel** and open the generated
+  `https://…` URL on the device.
 
-That flag serves the dev server over HTTPS with LAN access (via
-`@vitejs/plugin-basic-ssl`). It is opt-in and dev-only, so `npm run preview` and
-the Playwright suite stay on `http://localhost`.
+### Testing the camera on a phone via tunnel
 
-No-HTTPS alternative: proxy the dev server to the device with
-`adb reverse tcp:5173 tcp:5173`, then open `http://localhost:5173` (localhost is
-already a secure context).
+A quick [Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/)
+gives a real, trusted `https://…trycloudflare.com` URL with **no certificate
+warning**, so the phone camera works. `cloudflared` ships as a dev dependency
+(the `cloudflared` npm wrapper), so no separate install is needed:
+
+```bash
+npm run preview:tunnel   # builds, serves the bundle on :4173, and opens a tunnel
+# or
+npm run dev:tunnel       # dev server on :5173 + tunnel (live HMR, but slower through the tunnel)
+```
+
+Open the printed `https://<random>.trycloudflare.com` URL on the phone and allow
+the camera. Notes:
+
+- **Prefer `preview:tunnel` for phone testing.** The dev server streams hundreds
+  of separate module requests, which is unreliable through a quick tunnel; the
+  bundled build is a couple of files and loads consistently.
+- The tunnel URL is **public and random each run** — dev/testing only (app data
+  stays in the phone's own IndexedDB, nothing is uploaded).
+- Both dev and preview servers allow the `.trycloudflare.com` host
+  (`server`/`preview` `allowedHosts` in `vite.config.ts`), which Vite otherwise
+  blocks by default.
+- Needs internet; a quick tunnel has no uptime guarantee.
+
+A self-signed dev certificate is intentionally **not** used, because browsers
+always show an `ERR_CERT_AUTHORITY_INVALID` warning for it.
 
 ### Production
 

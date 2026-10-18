@@ -12,6 +12,15 @@ import {
 import { healLocalAccountViaSupabase } from '@/services/supabase-account'
 import { fetchAccountStatus, verifyAccountStatus } from '@/services/account-status-service'
 import { refreshPosCatalog } from '@/services/pos-catalog-service'
+import {
+  EMPTY_CLOUD_CONFIG,
+  clearRestoreContext,
+  readCloudStoreConfig,
+  saveCloudStoreConfig,
+  stashRestoreContext,
+  withTransientSession,
+  type CloudStoreConfig,
+} from '@/services/cloud-store-config-service'
 import { isOnline, subscribeOnline } from '@/offline/connectivity'
 import { nowIso } from '@/database/repos/helpers'
 import {
@@ -37,7 +46,7 @@ interface AuthValue {
   suspended: boolean
   /** Clear the block and return to sign-in (used by the suspended screen). */
   acknowledgeSuspension: () => void
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<User>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   register: (input: {
     fullName: string
     address: string
@@ -49,6 +58,36 @@ interface AuthValue {
   logout: () => Promise<void>
   refresh: () => void
   setStoreLocal: (store: Store) => void
+}
+
+/** Outcome of a sign-in. `needsRestore` means: existing account, no workspace here. */
+export interface LoginResult {
+  user: User
+  needsRestore: boolean
+}
+
+/**
+ * Best-effort backstop: keep the account's cloud store config in sync so another
+ * device can recover the assigned POS type. Runs in a short-lived Supabase
+ * session (the client keeps none), so the password is used once and discarded.
+ */
+async function syncConfigToCloud(
+  email: string,
+  password: string,
+  name: string,
+  posType: string
+): Promise<void> {
+  if (!isOnline()) return
+  try {
+    await withTransientSession(email, password, async () => {
+      const cloud = await readCloudStoreConfig()
+      if (!cloud.found || cloud.store?.posType !== posType) {
+        await saveCloudStoreConfig(name, posType)
+      }
+    })
+  } catch {
+    /* best-effort: a failed config push never blocks sign-in */
+  }
 }
 
 const AuthContext = React.createContext<AuthValue | null>(null)
@@ -185,19 +224,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [ready, user?.id, refresh])
 
   const login = React.useCallback(
-    async (email: string, password: string, rememberMe = true) => {
+    async (email: string, password: string, rememberMe = true): Promise<LoginResult> => {
       pendingRef.current = true
       try {
         let u: User
+        let healed = false
+        let healedCloud: CloudStoreConfig | null = null
         try {
           u = await repoLogin(email, password, rememberMe)
         } catch (err) {
           // Local sign-in failed. If this account was created through Supabase
           // Auth (verified email, no local record yet) we repair it online —
           // existing local accounts keep working fully offline.
-          const healed = await healLocalAccountViaSupabase(email, password)
-          if (!healed) throw err
-          u = healed
+          const healedResult = await healLocalAccountViaSupabase(email, password)
+          if (!healedResult) throw err
+          u = healedResult.user
+          healed = true
+          healedCloud = healedResult.cloud
         }
 
         // Authoritative online check BEFORE granting access.
@@ -212,7 +255,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await markUserAccountStatus(u.id, 'active', nowIso())
             clearSuspendedMarker()
             forcedRef.current = false
-            return u
           }
           // not_found / unknown / error — fall through to the cached status.
         }
@@ -224,7 +266,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new AccountSuspendedError()
         }
 
-        return u
+        // An account that existed in Supabase but had no local record is an
+        // EXISTING account on a new device — it must never be treated as a new
+        // signup. Surface the restore options instead of the onboarding wizard.
+        //
+        // The same is true when the local identity exists but the workspace does
+        // not (the user reached the restore screen before and came back later).
+        // Only claim "existing" when the account really WAS configured: a never
+        // onboarded account must still go through onboarding.
+        let needsRestore = healed
+        let restoreCloud: CloudStoreConfig | null = healedCloud
+
+        if (!needsRestore) {
+          const localStore = getStoreByUser(u.id)
+          if (localStore) {
+            // Keep the cloud copy in sync so future devices recover this
+            // account's POS type. Fire-and-forget — never delays sign-in.
+            void syncConfigToCloud(u.email, password, localStore.name, localStore.posType)
+          } else if (isOnline()) {
+            const cloud = await withTransientSession(u.email, password, readCloudStoreConfig)
+            if (cloud?.found && cloud.store) {
+              needsRestore = true
+              restoreCloud = cloud
+            }
+          }
+        }
+
+        if (needsRestore) {
+          stashRestoreContext({
+            email: u.email,
+            cloud: restoreCloud ?? EMPTY_CLOUD_CONFIG,
+            hasCloudStore: Boolean(restoreCloud?.store),
+          })
+        }
+
+        return { user: u, needsRestore }
       } finally {
         // Release the gate only after the decision is made, then surface the
         // resulting session state (signed-in user, or null after a block).
@@ -246,6 +322,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = React.useCallback(async () => {
     await repoLogout()
+    // Never carry a half-finished restore hand-off across sign-outs.
+    clearRestoreContext()
     refresh()
   }, [refresh])
 

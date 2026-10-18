@@ -38,16 +38,20 @@ export function ConfirmPage() {
         }
 
         const user = await finalizePendingRegistration(email)
-        await signOutSupabase()
         if (!active) return
 
         if (!user) {
           // Confirmed elsewhere (or local data cleared) — let them sign in; the
           // login path repairs the local account from Supabase.
+          await signOutSupabase()
           setPhase('no-local')
           return
         }
 
+        // NOTE: the transient Supabase session is intentionally kept until the
+        // onboarding wizard finishes, so the account's POS type can be saved to
+        // the cloud immediately (supabase/15_client_store_config.sql). The
+        // onboarding page signs out once setup completes.
         setPhase('confirmed')
         refresh()
         toast.success('Email confirmed — let’s set up your workspace!')

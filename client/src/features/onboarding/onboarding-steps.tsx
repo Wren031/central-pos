@@ -22,6 +22,7 @@ export function PosTypeStep({
   onRetry,
   onContinue,
   onBack,
+  lockedId = null,
 }: {
   types: PosTypeDef[]
   loading: boolean
@@ -31,6 +32,11 @@ export function PosTypeStep({
   onRetry: () => void
   onContinue: () => void
   onBack?: () => void
+  /**
+   * An account's POS type is assigned once. When set, it is the only selectable
+   * option — the user must not be able to switch workspaces here.
+   */
+  lockedId?: string | null
 }) {
   return (
     <div className="space-y-5">
@@ -43,6 +49,13 @@ export function PosTypeStep({
           Pick the workspace that fits your trade. Your catalog starts empty.
         </p>
       </div>
+
+      {lockedId && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+          This account is already assigned to <strong>{lockedId}</strong>. The POS type is fixed and
+          cannot be changed here — contact an administrator if it needs to change.
+        </div>
+      )}
 
       {error ? (
         <Card className="gap-3 p-6 text-center shadow-none">
@@ -81,14 +94,19 @@ export function PosTypeStep({
         >
           {types.map((type) => {
             const isSelected = selected === type.id
+            const isLockedOut = Boolean(lockedId) && type.id !== lockedId
             return (
               <Card
                 key={type.id}
                 role="radio"
                 aria-checked={isSelected}
-                tabIndex={0}
-                onClick={() => onSelect(type.id)}
+                aria-disabled={isLockedOut}
+                tabIndex={isLockedOut ? -1 : 0}
+                onClick={() => {
+                  if (!isLockedOut) onSelect(type.id)
+                }}
                 onKeyDown={(e) => {
+                  if (isLockedOut) return
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     onSelect(type.id)
@@ -96,7 +114,8 @@ export function PosTypeStep({
                 }}
                 className={cn(
                   'relative cursor-pointer gap-2.5 p-3 shadow-none transition-all hover:border-foreground/25 hover:shadow-sm',
-                  isSelected && 'border-2 shadow-md ring-1 ring-foreground/10'
+                  isSelected && 'border-2 shadow-md ring-1 ring-foreground/10',
+                  isLockedOut && 'cursor-not-allowed opacity-40 hover:border-border hover:shadow-none'
                 )}
                 style={isSelected ? { borderColor: type.theme.accent } : undefined}
               >

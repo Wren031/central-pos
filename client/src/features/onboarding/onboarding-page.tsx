@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { getPosType, getPosTypes, isPosCatalogEmpty } from '@/lib/pos-types'
 import { refreshPosCatalog, getPosCatalogError } from '@/services/pos-catalog-service'
+import { saveCloudStoreConfig } from '@/services/cloud-store-config-service'
+import { signOutSupabase } from '@/services/auth-service'
 import { setInitialSubscription, setupStore } from '@/lib/repos'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
@@ -102,6 +104,15 @@ export function OnboardingPage() {
           durationDays: plan.durationDays,
         })
       }
+      // Persist the assigned POS type so another device can recover this
+      // workspace. Best-effort and non-blocking: the session may already be
+      // gone (e.g. the user reloaded), in which case the next online sign-in
+      // uploads it instead.
+      void saveCloudStoreConfig(s.name, selected)
+        .catch(() => {})
+        .finally(() => {
+          void signOutSupabase()
+        })
       clearInterval(timer)
       setStoreLocal(s)
       refresh()
@@ -177,6 +188,7 @@ export function OnboardingPage() {
               onSelect={setSelected}
               onRetry={() => void load()}
               onContinue={() => setStage('plan')}
+              lockedId={store?.posType ?? null}
             />
           ) : (
             <PlanDurationStep

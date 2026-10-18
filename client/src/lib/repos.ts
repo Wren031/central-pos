@@ -7,6 +7,7 @@ export { subscribeDb, getCache } from '@/database/cache'
 
 export {
   registerUser,
+  createLocalAccountFromCloud,
   login,
   logout,
   getSession,
@@ -23,6 +24,8 @@ export {
   getStoreByUser,
   setupStore,
   changePosType,
+  restoreStoreFromCloud,
+  hasLocalStore,
 } from '@/database/repos/auth'
 
 export {

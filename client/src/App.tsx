@@ -7,6 +7,7 @@ import { LoginPage } from '@/features/auth/login-page'
 import { RegisterPage } from '@/features/auth/register-page'
 import { ConfirmPage } from '@/features/auth/confirm-page'
 import { OnboardingPage } from '@/features/onboarding/onboarding-page'
+import { RestorePage } from '@/features/restore/restore-page'
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { SubscriptionPage } from '@/features/subscription/subscription-page'
 import { CatalogPage } from '@/features/pos/catalog-page'
@@ -68,6 +69,14 @@ export default function App() {
                       element={
                         <ProtectedRoute>
                           <OnboardingPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/restore"
+                      element={
+                        <ProtectedRoute>
+                          <RestorePage />
                         </ProtectedRoute>
                       }
                     />

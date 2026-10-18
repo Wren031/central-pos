@@ -10,6 +10,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useAuth } from '@/state/auth-context'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { useSyncStatus } from '@/hooks/use-sync-status'
 import { syncManager } from '@/offline/sync-manager'
@@ -18,22 +29,35 @@ import { importDatabase, readFileAsText } from '@/services/import-service'
 import { cn } from '@/lib/utils'
 
 /**
- * Export/import + sync controls. Cloud sync is simulated; this is an
- * offline-first demo build with no backend.
+ * Account-scoped export/import + sync controls. Cloud sync of business data is
+ * simulated (the data lives in this browser's IndexedDB); the JSON backup is the
+ * supported way to move a workspace between devices.
  */
 export function DataSyncCard() {
+  const { user, store, refresh } = useAuth()
   const online = useOnlineStatus()
   const s = useSyncStatus()
   const fileRef = React.useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = React.useState(false)
   const [importing, setImporting] = React.useState(false)
+  const [pendingFile, setPendingFile] = React.useState<{ name: string; text: string } | null>(null)
 
   async function handleExport() {
+    if (!user || !store) {
+      toast.error('Set up your workspace before exporting a backup.')
+      return
+    }
     setExporting(true)
     try {
-      const payload = await exportDatabase()
+      const payload = await exportDatabase({ userId: user.id, email: user.email, store })
       downloadExport(payload)
-      toast.success('Backup downloaded')
+      const count =
+        payload.data.products.length +
+        payload.data.orders.length +
+        payload.data.customers.length
+      toast.success('Backup downloaded', {
+        description: count === 0 ? 'This workspace has no sales data yet.' : undefined,
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export failed.')
     } finally {
@@ -41,21 +65,46 @@ export function DataSyncCard() {
     }
   }
 
-  async function handleImportFile(file: File) {
-    setImporting(true)
+  async function onPickFile(file: File) {
     try {
       const text = await readFileAsText(file)
-      const result = await importDatabase(text)
-      const parts = Object.entries(result.restored)
+      setPendingFile({ name: file.name, text })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read that file.')
+    } finally {
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  async function confirmImport() {
+    if (!pendingFile || !user || !store) return
+    setImporting(true)
+    try {
+      const result = await importDatabase(pendingFile.text, {
+        userId: user.id,
+        store,
+        email: user.email,
+      })
+      const added = Object.entries(result.restored)
         .filter(([, n]) => n > 0)
         .map(([k, n]) => `${n} ${k}`)
         .join(', ')
-      toast.success(`Backup restored — ${parts || 'nothing to restore'}`)
+      toast.success('Backup merged', {
+        description: added
+          ? `Added ${added}. Existing records were kept.`
+          : 'Nothing new to add — this backup is already on the device.',
+      })
+      if (result.differentAccount) {
+        toast.info('Backup came from a different account', {
+          description: 'Rows were attached to your current account and workspace.',
+        })
+      }
+      refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Import failed.')
     } finally {
       setImporting(false)
-      if (fileRef.current) fileRef.current.value = ''
+      setPendingFile(null)
     }
   }
 
@@ -67,8 +116,8 @@ export function DataSyncCard() {
           Data &amp; sync
         </CardTitle>
         <CardDescription>
-          Your data lives in this browser (IndexedDB) and works fully offline. Cloud sync is
-          simulated for demo purposes — export a JSON backup to move data between devices.
+          Your data lives in this browser (IndexedDB) and works fully offline. Export a JSON backup
+          to move this workspace to another device.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -97,30 +146,64 @@ export function DataSyncCard() {
               Retry failed
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => void handleExport()} disabled={exporting}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleExport()}
+            disabled={exporting || !store}
+          >
             {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
             Export backup
           </Button>
-          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={importing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+            disabled={importing || !store}
+          >
             {importing ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-            Import backup
+            Restore backup
           </Button>
           <input
             ref={fileRef}
             type="file"
             accept="application/json,.json"
             className="hidden"
-            aria-label="Import backup file"
+            aria-label="Choose a backup file"
             onChange={(e) => {
               const file = e.target.files?.[0]
-              if (file) void handleImportFile(file)
+              if (file) void onPickFile(file)
             }}
           />
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Importing replaces all local data with the backup contents. Passwords are not included
-          in exports — accounts must re-register or reset after a restore.
+          The backup contains only <strong>this account and this store</strong> (products, stock,
+          customers, orders, reports and device settings). Restoring <strong>merges</strong> — it
+          never deletes or overwrites existing records. Passwords and keys are never included.
         </p>
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] leading-relaxed text-amber-900">
+          <strong>Moving devices?</strong> Export the backup from the device that has the data. A
+          backup exported from an empty device will not recover data saved on another device.
+        </p>
+
+        <AlertDialog open={pendingFile !== null} onOpenChange={(o) => !o && setPendingFile(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restore this backup?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-mono text-xs">{pendingFile?.name}</span> will be merged into{' '}
+                <strong>{store?.name ?? 'your workspace'}</strong>. Existing products, orders and
+                customers are kept; only records that aren&apos;t already here are added.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={importing}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void confirmImport()} disabled={importing}>
+                {importing ? 'Restoring…' : 'Restore backup'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )

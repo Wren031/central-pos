@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/state/auth-context'
+import { readRestoreContextFor } from '@/services/cloud-store-config-service'
 import { AccountSuspendedError } from '@/lib/account-status'
 import { AuthLayout } from './auth-layout'
 
@@ -49,7 +50,11 @@ export function LoginPage() {
   // flight we must NOT navigate yet: the local session is created before the
   // account-status check completes, so redirecting early would flash the
   // workspace (and swallow the suspension message) for a suspended account.
-  if (user && !submitting) return <Navigate to="/" replace />
+  if (user && !submitting) {
+    // An existing account signing in on a device with no local data goes to the
+    // restore screen, never straight into an empty workspace.
+    return <Navigate to={readRestoreContextFor(user.email) ? '/restore' : '/'} replace />
+  }
 
   const from = (location.state as { from?: string } | null)?.from ?? '/'
 
@@ -57,8 +62,15 @@ export function LoginPage() {
     setServerError(null)
     setSuspended(false)
     try {
-      const u = await login(values.email, values.password, rememberMe)
-      toast.success(`Welcome back, ${u.fullName.split(' ')[0]}!`)
+      const result = await login(values.email, values.password, rememberMe)
+      if (result.needsRestore) {
+        toast.info('This account already exists.', {
+          description: 'Choose how to bring its POS data onto this device.',
+        })
+        navigate('/restore', { replace: true })
+        return
+      }
+      toast.success(`Welcome back, ${result.user.fullName.split(' ')[0]}!`)
       navigate(from, { replace: true })
     } catch (err) {
       setSuspended(err instanceof AccountSuspendedError)

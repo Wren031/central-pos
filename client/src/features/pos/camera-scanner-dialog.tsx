@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  cameraUnavailableReason,
   describeCameraError,
   listCameras,
   openCameraStream,
@@ -33,8 +32,6 @@ import {
  *     is never left running and rapid re-opens can't race a stale `srcObject`.
  *   * A per-effect `cancelled` flag invalidates late async work (StrictMode
  *     double-invokes effects in dev), so a dead session only stops its OWN stream.
- *   * Capability checks run before touching getUserMedia, so insecure origins
- *     produce an actionable HTTPS/localhost message instead of a TypeError.
  *
  * Starts only when the dialog is open AND the video element exists, and stops on
  * close or unmount. `@zxing/browser` is imported lazily so it stays in its own
@@ -84,9 +81,6 @@ export function CameraScannerDialog({
   // Ignore duplicate detections — the decoder fires on every decoded frame.
   const lastRef = React.useRef<{ code: string; at: number }>({ code: '', at: 0 })
 
-  // Static "can we even try" verdict, computed once per mount.
-  const unavailableReason = React.useMemo(() => cameraUnavailableReason(), [])
-
   React.useEffect(() => {
     if (!open) {
       // Reset so a fresh open starts clean.
@@ -111,13 +105,6 @@ export function CameraScannerDialog({
     setError(null)
     setCameras([])
     lastRef.current = { code: '', at: 0 }
-
-    // If the context can't do getUserMedia at all, fail fast with the real reason.
-    if (unavailableReason) {
-      setError(unavailableReason)
-      setStarting(false)
-      return
-    }
 
     void (async () => {
       try {
@@ -187,7 +174,7 @@ export function CameraScannerDialog({
       }
     }
     // `hasVideo` (not the element) is the dep so the effect re-runs once mounted.
-  }, [open, hasVideo, selectedDeviceId, retryNonce, unavailableReason])
+  }, [open, hasVideo, selectedDeviceId, retryNonce])
 
   // Reflect a decoded/playing frame so the overlay clears only when video is real.
   function handleLoadedMetadata() {
@@ -229,17 +216,15 @@ export function CameraScannerDialog({
             <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center text-sm text-white">
               <CameraOff className="size-6" aria-hidden />
               <span>{error}</span>
-              {!unavailableReason && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setRetryNonce((n) => n + 1)}
-                >
-                  <RefreshCw className="size-3.5" />
-                  Retry
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setRetryNonce((n) => n + 1)}
+              >
+                <RefreshCw className="size-3.5" />
+                Retry
+              </Button>
             </span>
           )}
           {!starting && ready && !error && (
