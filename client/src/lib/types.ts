@@ -487,6 +487,8 @@ export type ScannerMode = 'camera' | 'usb'
 export interface ScannerSettings {
   storeId: string
   mode: ScannerMode
+  /** Master on/off switch for barcode scanning (defaults to on). */
+  enabled: boolean
   updatedAt: string
 }
 

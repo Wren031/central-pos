@@ -258,6 +258,8 @@ export async function login(
   // "Remember me" OFF → only survive within this browser session.
   if (rememberMe) clearEphemeralSession()
   else markEphemeralSession()
+  // Heal any legacy duplicate workspaces before hydrating the read model.
+  await normalizeLocalStores(user.id)
   await refreshCacheForUser(user.id)
   return user
 }
@@ -463,70 +465,137 @@ export async function deleteAccount(userId: string, password: string): Promise<v
 /* ---------- store & POS setup ---------- */
 
 export function getStoreByUser(userId: string): Store | null {
-  return getCache().stores.find((s) => s.userId === userId) ?? null
+  const stores = getCache().stores.filter((s) => s.userId === userId)
+  if (stores.length === 0) return null
+  // Deterministic when (legacy) duplicates exist: prefer a completed
+  // workspace, then the oldest row. A fresh array is sorted so the cache is
+  // never mutated.
+  return [...stores].sort((a, b) => {
+    if (a.onboarded !== b.onboarded) return a.onboarded ? -1 : 1
+    return a.createdAt.localeCompare(b.createdAt)
+  })[0]
 }
 
 /**
- * Creates (or switches) the user's store. New registrations always start
+ * Count the business rows attached to a store. Used to decide which legacy
+ * duplicate is the "real" workspace — never delete a store that holds data.
+ */
+async function storeDataCount(storeId: string): Promise<number> {
+  const [products, orders, customers, movements] = await Promise.all([
+    db.products.where('storeId').equals(storeId).count(),
+    db.orders.where('storeId').equals(storeId).count(),
+    db.customers.where('storeId').equals(storeId).count(),
+    db.stockMovements.where('storeId').equals(storeId).count(),
+  ])
+  return products + orders + customers + movements
+}
+
+/**
+ * Repairs legacy duplicate workspaces. A user must own exactly one store;
+ * duplicates were previously created by racing setup calls. Only EMPTY
+ * duplicates are removed — a store with products/orders/customers/stock is
+ * always kept so no business data can be lost.
+ */
+async function normalizeLocalStores(userId: string): Promise<void> {
+  const stores = await db.stores.where('userId').equals(userId).toArray()
+  if (stores.length <= 1) return
+
+  const scored: { store: Store; data: number }[] = []
+  for (const store of stores) {
+    scored.push({ store, data: await storeDataCount(store.id) })
+  }
+  scored.sort((a, b) => {
+    if (a.data !== b.data) return b.data - a.data
+    if (a.store.onboarded !== b.store.onboarded) return a.store.onboarded ? -1 : 1
+    return a.store.createdAt.localeCompare(b.store.createdAt)
+  })
+
+  const removable = scored.filter((row) => row.data === 0).map((row) => row.store.id)
+  if (removable.length === 0) return
+  await db.transaction('rw', db.stores, async () => {
+    await db.stores.bulkDelete(removable)
+  })
+}
+
+/**
+ * Creates (or completes) the user's ONE store. New registrations always start
  * with an EMPTY catalog — no generated products, categories, or stock.
- * Orders and reports are preserved on POS switch.
+ *
+ * Idempotent and race-safe: the lookup + write happen in one Dexie transaction,
+ * so double-clicks, refreshes, or two tabs cannot create duplicate workspaces.
+ * Re-running with the SAME POS type never wipes an existing catalog; a different
+ * type is refused (the workspace type is immutable in the client).
  */
 export async function setupStore(userId: string, posType: PosTypeId): Promise<Store> {
   await latency(500)
-  const user = await db.users.get(userId)
-  if (!user) throw new Error('User not found.')
-  const existing = await db.stores.where('userId').equals(userId).first()
-  // The workspace type is assigned once. Re-running setup with a different type
-  // would silently change the account's POS and wipe its catalog — refuse it.
-  if (existing && existing.posType !== posType) {
-    throw new Error(
-      'This account already has a POS type. It cannot be changed here — contact an administrator.'
-    )
-  }
-  let store: Store
-  const now = nowIso()
-  if (!existing) {
-    store = {
-      id: newId('str'),
-      userId,
-      name: user.businessName,
-      posType,
-      createdAt: now,
-      onboarded: true,
+
+  const store = await db.transaction(
+    'rw',
+    [db.users, db.stores, db.categories, db.syncQueue],
+    async () => {
+      const user = await db.users.get(userId)
+      if (!user) throw new Error('User not found.')
+
+      const existing = await db.stores.where('userId').equals(userId).first()
+      // The workspace type is assigned once. Re-running setup with a different
+      // type would silently change the account's POS and wipe its catalog.
+      if (existing && existing.posType !== posType) {
+        throw new Error(
+          'This account already has a POS type. It cannot be changed here — contact an administrator.'
+        )
+      }
+
+      const now = nowIso()
+
+      if (existing) {
+        // Complete an interrupted onboarding without touching existing data.
+        const updated: Store = {
+          ...existing,
+          name: existing.name?.trim() || user.businessName,
+          posType,
+          onboarded: true,
+        }
+        await db.stores.put(updated)
+        await ensureStoreCategories(updated, now)
+        if (!existing.onboarded) {
+          await putSyncOp(syncOpFor('store', updated.id, 'update', updated.id, { posType }))
+        }
+        return updated
+      }
+
+      const created: Store = {
+        id: newId('str'),
+        userId,
+        name: user.businessName,
+        posType,
+        createdAt: now,
+        onboarded: true,
+      }
+      await db.stores.put(created)
+      await ensureStoreCategories(created, now)
+      await putSyncOp(syncOpFor('store', created.id, 'create', created.id, { posType }))
+      return created
     }
-  } else {
-    store = { ...existing, posType, onboarded: true }
-  }
-  const oldProducts = existing
-    ? await db.products.where('storeId').equals(existing.id).toArray()
-    : []
-  // Categories come from the POS type's Supabase assignment (pos_type_categories).
-  const assignedCategories = getPosTypeCategories(posType).map((c) => ({
+  )
+
+  await refreshCacheForUser(userId)
+  return store
+}
+
+/**
+ * Load the POS type's category configuration only when the workspace has none.
+ * Never deletes existing categories (they may have been edited locally).
+ */
+async function ensureStoreCategories(store: Store, now: string): Promise<void> {
+  const count = await db.categories.where('storeId').equals(store.id).count()
+  if (count > 0) return
+  const assigned = getPosTypeCategories(store.posType).map((c) => ({
     id: c.categoryId,
     storeId: store.id,
     name: c.name,
     createdAt: now,
   }))
-  await db.transaction(
-    'rw',
-    [db.stores, db.products, db.categories, db.stockMovements, db.syncQueue],
-    async () => {
-      await db.stores.put(store)
-      // Load the POS type's category configuration into the workspace.
-      await db.categories.where('storeId').equals(store.id).delete()
-      if (assignedCategories.length > 0) {
-        await db.categories.bulkPut(assignedCategories)
-      }
-      if (existing) {
-        // POS layout changed — clear the old catalog so items match the new type.
-        await db.products.bulkDelete(oldProducts.map((p) => p.id))
-        await db.stockMovements.where('storeId').equals(store.id).delete()
-      }
-      await putSyncOp(syncOpFor('store', store.id, existing ? 'update' : 'create', store.id, { posType }))
-    }
-  )
-  await refreshCacheForUser(userId)
-  return store
+  if (assigned.length > 0) await db.categories.bulkPut(assigned)
 }
 
 export async function changePosType(userId: string, posType: PosTypeId): Promise<Store> {
@@ -545,60 +614,56 @@ export async function hasLocalStore(userId: string): Promise<boolean> {
  * an existing account signs in on a device with no local data: the POS type is
  * taken from the server and is never re-chosen by the user.
  *
- * Idempotent — if a store already exists it is returned unchanged (only a
- * missing/blank name is filled in). Never deletes products or stock.
+ * Idempotent and race-safe — if a store already exists it is returned unchanged
+ * (only a missing/blank name is filled in and missing categories are seeded).
+ * A valid local POS type is NEVER overwritten by the cloud value, and no
+ * products or stock are deleted.
  */
 export async function restoreStoreFromCloud(
   userId: string,
   cloud: { name: string; posType: PosTypeId }
 ): Promise<Store> {
   await latency(200)
-  const user = await db.users.get(userId)
-  if (!user) throw new Error('User not found.')
 
-  const existing = await db.stores.where('userId').equals(userId).first()
-  if (existing) {
-    if (!existing.name?.trim() && cloud.name.trim()) {
-      const renamed: Store = { ...existing, name: cloud.name.trim() }
-      await db.stores.put(renamed)
-      await refreshCacheForUser(userId)
-      return renamed
-    }
-    return existing
-  }
-
-  const now = nowIso()
-  const store: Store = {
-    id: newId('str'),
-    userId,
-    name: cloud.name.trim() || user.businessName,
-    posType: cloud.posType,
-    createdAt: now,
-    onboarded: true,
-  }
-  // Load the POS type's category configuration into the workspace (same source
-  // as setupStore). No products are created — the catalog stays empty until a
-  // backup is restored or items are added.
-  const assignedCategories = getPosTypeCategories(cloud.posType).map((c) => ({
-    id: c.categoryId,
-    storeId: store.id,
-    name: c.name,
-    createdAt: now,
-  }))
-
-  await db.transaction(
+  const store = await db.transaction(
     'rw',
-    [db.stores, db.categories, db.syncQueue],
+    [db.users, db.stores, db.categories, db.syncQueue],
     async () => {
-      await db.stores.put(store)
-      if (assignedCategories.length > 0) {
-        await db.categories.bulkPut(assignedCategories)
+      const user = await db.users.get(userId)
+      if (!user) throw new Error('User not found.')
+
+      const existing = await db.stores.where('userId').equals(userId).first()
+      if (existing) {
+        // Keep the local workspace type. Cloud recovery only fills gaps.
+        let current = existing
+        if (!existing.name?.trim() && cloud.name.trim()) {
+          current = { ...existing, name: cloud.name.trim() }
+          await db.stores.put(current)
+        }
+        await ensureStoreCategories(current, nowIso())
+        return current
       }
+
+      const now = nowIso()
+      const created: Store = {
+        id: newId('str'),
+        userId,
+        name: cloud.name.trim() || user.businessName,
+        posType: cloud.posType,
+        createdAt: now,
+        onboarded: true,
+      }
+      await db.stores.put(created)
+      // No products are created — the catalog stays empty until a backup is
+      // restored or items are added.
+      await ensureStoreCategories(created, now)
       await putSyncOp(
-        syncOpFor('store', store.id, 'create', store.id, { posType: cloud.posType })
+        syncOpFor('store', created.id, 'create', created.id, { posType: cloud.posType })
       )
+      return created
     }
   )
+
   await refreshCacheForUser(userId)
   return store
 }

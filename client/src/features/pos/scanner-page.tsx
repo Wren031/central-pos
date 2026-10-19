@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
 import { EmptyState } from '@/components/common/empty-state'
 import { PageHeader } from '@/components/common/page-header'
 import { scannerService } from '@/database/repos/scanner'
@@ -27,20 +28,24 @@ function ModeOption({
   title,
   description,
   onSelect,
+  disabled = false,
 }: {
   selected: boolean
   icon: React.ElementType
   title: string
   description: string
   onSelect: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
+      disabled={disabled}
       aria-pressed={selected}
       className={cn(
         'flex w-full items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all',
+        disabled && 'cursor-not-allowed opacity-50',
         selected
           ? 'border-primary ring-2 ring-primary/30'
           : 'hover:border-foreground/20 hover:shadow-sm'
@@ -72,7 +77,7 @@ function ModeOption({
 
 export function ScannerPage() {
   const { store } = useAuth()
-  const { mode } = useScannerSettings(store?.id)
+  const { mode, enabled } = useScannerSettings(store?.id)
   const [testOpen, setTestOpen] = React.useState(false)
   const [lastCode, setLastCode] = React.useState<string | null>(null)
 
@@ -82,6 +87,12 @@ export function ScannerPage() {
     if (!store || next === mode) return
     void scannerService.setMode(store.id, next)
     toast.success(next === 'usb' ? 'Using USB barcode scanner.' : 'Using camera scanner.')
+  }
+
+  function toggleEnabled(next: boolean) {
+    if (!store) return
+    void scannerService.setEnabled(store.id, next)
+    toast.success(next ? 'Barcode scanner turned on.' : 'Barcode scanner turned off.')
   }
 
   if (!store) {
@@ -132,7 +143,35 @@ export function ScannerPage() {
         description={`How cashiers scan products for ${posDef.name}`}
       />
 
-      <div className="space-y-3">
+      <Card className="shadow-none">
+        <CardHeader className="flex-row items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={cn(
+                'flex size-10 shrink-0 items-center justify-center rounded-lg',
+                enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              )}
+            >
+              <ScanBarcode className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <CardTitle className="text-base">Enable barcode scanner</CardTitle>
+              <CardDescription>
+                {enabled
+                  ? 'Scanner is on — cashiers can scan products on the Sell screen.'
+                  : 'Scanner is off — scanning is hidden on the Sell screen.'}
+              </CardDescription>
+            </div>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={toggleEnabled}
+            aria-label="Turn barcode scanner on or off"
+          />
+        </CardHeader>
+      </Card>
+
+      <div className={cn('space-y-3', !enabled && 'opacity-60')}>
         <p className="text-sm font-medium">Scanning method</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <ModeOption
@@ -141,6 +180,7 @@ export function ScannerPage() {
             title="Camera scanner"
             description="Use this device’s camera to read barcodes. Works on phones, tablets, and laptops."
             onSelect={() => choose('camera')}
+            disabled={!enabled}
           />
           <ModeOption
             selected={mode === 'usb'}
@@ -148,8 +188,14 @@ export function ScannerPage() {
             title="USB barcode scanner"
             description="A handheld scanner that acts like a keyboard. Plug it in and scan — no setup needed."
             onSelect={() => choose('usb')}
+            disabled={!enabled}
           />
         </div>
+        {!enabled && (
+          <p className="text-xs text-muted-foreground">
+            Turn the scanner on above to change the scanning method.
+          </p>
+        )}
       </div>
 
       {mode === 'usb' ? (
@@ -195,14 +241,21 @@ export function ScannerPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              On the Sell screen, tap <strong>Scan</strong> to open the camera. Hold the barcode in
-              the frame and it is added to the cart automatically.
+              {enabled ? (
+                <>
+                  On the Sell screen, tap <strong>Scan</strong> to open the camera. Hold the
+                  barcode in the frame and it is added to the cart automatically.
+                </>
+              ) : (
+                <>Turn the scanner on above to scan products from the Sell screen.</>
+              )}
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setTestOpen(true)}
+                disabled={!enabled}
               >
                 <Camera className="size-4" />
                 Test camera
@@ -218,7 +271,7 @@ export function ScannerPage() {
       )}
 
       <CameraScannerDialog
-        open={testOpen}
+        open={enabled && testOpen}
         onOpenChange={setTestOpen}
         onDetect={(code) => {
           setLastCode(code)

@@ -21,6 +21,7 @@
     "test:product-image": "node scripts/product-image-test.mjs",
     "test:camera": "node scripts/camera-scanner-test.mjs",
     "test:existing-account": "node scripts/existing-account-test.mjs",
+    "test:workspace-identity": "node scripts/workspace-identity-test.mjs",
     "test:pagination": "node scripts/pagination-test.mjs",
     "test:escpos": "node scripts/print-escpos-test.mjs",
     "test:raster": "node scripts/print-raster-test.mjs"

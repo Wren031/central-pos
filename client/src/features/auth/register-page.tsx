@@ -110,6 +110,7 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [step, setStep] = React.useState<'details' | 'verify'>('details')
   const [signupError, setSignupError] = React.useState<string | null>(null)
+  const [existingAccount, setExistingAccount] = React.useState(false)
   const [sendingLink, setSendingLink] = React.useState(false)
   const pendingValues = React.useRef<FormValues | null>(null)
   // Email whose Supabase account we already created this session, so a
@@ -134,6 +135,7 @@ export function RegisterPage() {
   async function onSubmit(values: FormValues) {
     const email = values.email.trim().toLowerCase()
     setSignupError(null)
+    setExistingAccount(false)
 
     // Already have a local account for this email? Send them to sign in
     // instead of creating a duplicate account.
@@ -154,9 +156,13 @@ export function RegisterPage() {
       try {
         // An explicit new signup lifts any deletion tombstone for this email.
         clearAccountDeleted(email)
-        // Stage the local account so the /auth/confirm redirect can finalize it,
-        // then ask Supabase to email the confirmation link.
-        await stagePendingRegistration({
+
+        // Ask Supabase FIRST. If the email already belongs to an account, the
+        // server does not change its password — staging a local identity here
+        // would create a device account whose password no longer matches the
+        // cloud, breaking every later workspace lookup ("sign in again after
+        // your workspace type has synced"). Treat it as a sign-in instead.
+        const result = await startSignup({
           fullName: values.fullName,
           address: values.address,
           contactNumber: values.contactNumber,
@@ -164,7 +170,17 @@ export function RegisterPage() {
           email,
           password: values.password,
         })
-        await startSignup({
+
+        if (result.status === 'existing') {
+          await clearPendingRegistration(email)
+          setExistingAccount(true)
+          setSendingLink(false)
+          return
+        }
+
+        // Genuine new account: stage the local identity so the confirmation
+        // redirect can finalize it without ever storing plaintext.
+        await stagePendingRegistration({
           fullName: values.fullName,
           address: values.address,
           contactNumber: values.contactNumber,
@@ -245,6 +261,20 @@ export function RegisterPage() {
             <WifiOff className="size-4 shrink-0" aria-hidden />
             You are offline. Connect to the internet to register and confirm your email.
           </div>
+        )}
+        {existingAccount && (
+          <Alert className="border-amber-500/40 bg-amber-500/[0.06]">
+            <CircleAlert aria-hidden />
+            <AlertTitle>This email already has an account</AlertTitle>
+            <AlertDescription>
+              Sign in with the password you used when you first registered — creating a new local
+              account here would not match it. If your email is not confirmed yet, we sent a fresh
+              confirmation link.
+              <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                <Link to="/login">Go to sign in</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
         {signupError && (
           <Alert variant="destructive" className="border-destructive/30">

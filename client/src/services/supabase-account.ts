@@ -5,6 +5,8 @@ import { AuthFlowError } from '@/services/auth-service'
 import { isAccountDeleted } from '@/lib/deleted-accounts'
 import {
   readCloudStoreConfig,
+  releaseTransientSession,
+  retainCurrentSession,
   type CloudStoreConfig,
 } from '@/services/cloud-store-config-service'
 import type { User } from '@/lib/types'
@@ -71,6 +73,7 @@ export async function healLocalAccountViaSupabase(
     return null
   }
 
+  let keepSession = false
   try {
     // Read the account's existing configuration while the session is live.
     const cloud = await readCloudStoreConfig()
@@ -96,8 +99,13 @@ export async function healLocalAccountViaSupabase(
           : undefined,
     })
 
+    // If the workspace lookup failed, keep the in-memory session so /restore
+    // can retry without forcing another sign-in.
+    keepSession = cloud.status === 'unavailable'
+    if (keepSession) retainCurrentSession()
+
     return { user: local, cloud }
   } finally {
-    await supabase.auth.signOut().catch(() => {})
+    if (!keepSession) await releaseTransientSession()
   }
 }

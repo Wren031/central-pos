@@ -5,7 +5,10 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { getPosType, getPosTypes, isPosCatalogEmpty } from '@/lib/pos-types'
 import { refreshPosCatalog, getPosCatalogError } from '@/services/pos-catalog-service'
-import { saveCloudStoreConfig } from '@/services/cloud-store-config-service'
+import {
+  readRestoreContextFor,
+  saveCloudStoreConfig,
+} from '@/services/cloud-store-config-service'
 import { signOutSupabase } from '@/services/auth-service'
 import { setInitialSubscription, setupStore } from '@/lib/repos'
 import { cn } from '@/lib/utils'
@@ -69,6 +72,14 @@ export function OnboardingPage() {
   }, [stage, planId, allPlans])
 
   if (!user) return <Navigate to="/login" replace />
+
+  // A pending restore hand-off means the account's workspace must be resolved
+  // (found in the cloud, or retried) before any POS type can be chosen here.
+  // Creating a workspace from onboarding is only allowed once /restore has
+  // explicitly confirmed there is none.
+  if (readRestoreContextFor(user.email)) {
+    return <Navigate to="/restore" replace />
+  }
 
   // POS type is chosen once during first-time setup — account holders cannot switch.
   if (store?.onboarded) return <Navigate to="/" replace />

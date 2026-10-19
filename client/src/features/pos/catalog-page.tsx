@@ -159,6 +159,8 @@ export function CatalogPage() {
   const scanner = useScannerSettings(store?.id)
   const posDef = store ? getPosType(store.posType) : null
   const barcodeEnabled = posDef?.barcodeEnabled ?? false
+  // Master switch from the Scanner settings page (admin flag still gates it).
+  const scannerOn = barcodeEnabled && scanner.enabled
   const locked = !state.canSell
   const [products, setProducts] = React.useState<Product[] | null>(null)
   const [query, setQuery] = React.useState('')
@@ -256,7 +258,7 @@ export function CatalogPage() {
   // USB scanners emulate a keyboard: they type the barcode then press Enter.
   // Capture that keystroke stream globally, but never while typing in a field.
   React.useEffect(() => {
-    if (!barcodeEnabled || scanner.mode !== 'usb' || locked) return
+    if (!scannerOn || scanner.mode !== 'usb' || locked) return
     let buffer = ''
     let lastAt = 0
     const onKey = (e: KeyboardEvent) => {
@@ -293,7 +295,7 @@ export function CatalogPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [barcodeEnabled, scanner.mode, locked, handleScan])
+  }, [scannerOn, scanner.mode, locked, handleScan])
 
   if (!store || !posDef) {
     return (
@@ -332,7 +334,7 @@ export function CatalogPage() {
               aria-label="Search products"
             />
           </div>
-          {barcodeEnabled && scanner.mode === 'camera' && (
+          {scannerOn && scanner.mode === 'camera' && (
             <Button
               type="button"
               variant="outline"
@@ -344,12 +346,57 @@ export function CatalogPage() {
               Scan
             </Button>
           )}
-          {barcodeEnabled && scanner.mode === 'usb' && (
+          {scannerOn && scanner.mode === 'usb' && (
             <span className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground sm:flex">
               <ScanLine className="size-4" aria-hidden />
               USB scanner ready
             </span>
           )}
+          {/* Mobile: icon-only category picker, beside the grid toggle. */}
+          <Sheet open={categoryOpen} onOpenChange={setCategoryOpen}>
+            <SheetTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="relative shrink-0 sm:hidden"
+                aria-label={
+                  category === 'All'
+                    ? 'Choose category'
+                    : `Choose category, current: ${category}`
+                }
+                title="Choose category"
+              >
+                <Tags className="size-4" />
+                {category !== 'All' && (
+                  <span
+                    className="absolute top-1.5 right-1.5 size-2 rounded-full"
+                    style={{ backgroundColor: posDef.theme.accent }}
+                    aria-hidden
+                  />
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl">
+              <SheetHeader className="border-b">
+                <SheetTitle>Choose category</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-wrap gap-2 overflow-y-auto p-4">
+                {categories.map((c) => (
+                  <CategoryChip
+                    key={c}
+                    label={c}
+                    selected={category === c}
+                    accent={posDef.theme.accent}
+                    onSelect={() => {
+                      setCategory(c)
+                      setCategoryOpen(false)
+                    }}
+                  />
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
           <Button
             type="button"
             variant="outline"
@@ -381,65 +428,17 @@ export function CatalogPage() {
 
       <div className="flex min-h-0 flex-1 gap-6">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="mb-4 flex shrink-0 items-center">
-            {/* Mobile: icon-only filter that opens the full category list. */}
-            <Sheet open={categoryOpen} onOpenChange={setCategoryOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="relative shrink-0 sm:hidden"
-                  aria-label={
-                    category === 'All'
-                      ? 'Choose category'
-                      : `Choose category, current: ${category}`
-                  }
-                  title="Choose category"
-                >
-                  <Tags className="size-4" />
-                  {category !== 'All' && (
-                    <span
-                      className="absolute top-1.5 right-1.5 size-2 rounded-full"
-                      style={{ backgroundColor: posDef.theme.accent }}
-                      aria-hidden
-                    />
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-2xl">
-                <SheetHeader className="border-b">
-                  <SheetTitle>Choose category</SheetTitle>
-                </SheetHeader>
-                <div className="flex flex-wrap gap-2 overflow-y-auto p-4">
-                  {categories.map((c) => (
-                    <CategoryChip
-                      key={c}
-                      label={c}
-                      selected={category === c}
-                      accent={posDef.theme.accent}
-                      onSelect={() => {
-                        setCategory(c)
-                        setCategoryOpen(false)
-                      }}
-                    />
-                  ))}
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            {/* Tablet/desktop: category pills. */}
-            <div className="hidden flex-wrap gap-1.5 pb-1 sm:flex">
-              {categories.map((c) => (
-                <CategoryChip
-                  key={c}
-                  label={c}
-                  selected={category === c}
-                  accent={posDef.theme.accent}
-                  onSelect={() => setCategory(c)}
-                />
-              ))}
-            </div>
+          {/* Tablet/desktop: category pills (mobile uses the icon in the header). */}
+          <div className="mb-4 hidden shrink-0 flex-wrap gap-1.5 pb-1 sm:flex">
+            {categories.map((c) => (
+              <CategoryChip
+                key={c}
+                label={c}
+                selected={category === c}
+                accent={posDef.theme.accent}
+                onSelect={() => setCategory(c)}
+              />
+            ))}
           </div>
 
           <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-24 lg:pb-4">
@@ -585,7 +584,7 @@ export function CatalogPage() {
 
       <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} />
 
-      {barcodeEnabled && scanner.mode === 'camera' && (
+      {scannerOn && scanner.mode === 'camera' && (
         <CameraScannerDialog open={scanOpen} onOpenChange={setScanOpen} onDetect={handleScan} />
       )}
 

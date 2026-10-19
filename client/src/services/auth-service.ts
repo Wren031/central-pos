@@ -130,11 +130,22 @@ export function confirmationRedirectUrl(): string {
   return `${origin}/auth/confirm`
 }
 
+export interface StartSignupResult {
+  /**
+   * `created` — Supabase created a new account and sent the confirmation link.
+   * `existing` — the email already belongs to a Supabase account. No password
+   * was changed and no local registration may be finalized: the user must sign
+   * in with their ORIGINAL password. This is what previously produced a local
+   * identity whose password no longer matched the server.
+   */
+  status: 'created' | 'existing'
+}
+
 /**
  * Creates the Supabase account and triggers the confirmation email.
  * Requires an internet connection.
  */
-export async function startSignup(details: SignupDetails): Promise<void> {
+export async function startSignup(details: SignupDetails): Promise<StartSignupResult> {
   ensureOnline()
   const client = requireSupabase()
 
@@ -165,12 +176,16 @@ export async function startSignup(details: SignupDetails): Promise<void> {
   }
 
   // Supabase returns no error for an email that already exists (to avoid
-  // account enumeration) — it yields a user with no identities. Resend the
-  // confirmation link; if the account is already confirmed, that fails and the
-  // real reason is surfaced (usually "already exists — sign in").
+  // account enumeration) — it yields a user with no identities. Best-effort
+  // resend helps users whose email is still unconfirmed, then tell the caller
+  // this is an EXISTING account so it does not stage/finalize a new identity.
   if (isDuplicateSignupResponse(user.identities)) {
-    await resendConfirmation(details.email)
-    return
+    try {
+      await resendConfirmation(details.email)
+    } catch {
+      /* already confirmed / rate-limited — the message below still applies */
+    }
+    return { status: 'existing' }
   }
 
   // Fresh signup. If Supabase already marked the email confirmed (or returned a
@@ -183,6 +198,8 @@ export async function startSignup(details: SignupDetails): Promise<void> {
       'Email confirmation is turned off for this Supabase project, so no verification email is sent. Ask an administrator to enable “Confirm email” in Authentication → Providers → Email.'
     )
   }
+
+  return { status: 'created' }
 }
 
 /** Re-sends the confirmation email. Requires an internet connection. */

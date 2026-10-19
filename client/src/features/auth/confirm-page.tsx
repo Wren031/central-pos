@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle2, CircleAlert, Loader2, MailWarning } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { finalizePendingRegistration } from '@/lib/repos'
+import { finalizePendingRegistration, restoreStoreFromCloud } from '@/lib/repos'
 import { authErrorMessage, readConfirmedUserFromRedirect, signOutSupabase } from '@/services/auth-service'
+import { readCloudStoreConfig } from '@/services/cloud-store-config-service'
 import { useAuth } from '@/state/auth-context'
 import { AuthLayout } from './auth-layout'
 
@@ -46,6 +47,34 @@ export function ConfirmPage() {
           await signOutSupabase()
           setPhase('no-local')
           return
+        }
+
+        // A confirmed account may already own a workspace (e.g. the email was
+        // registered before, or this device just finished healing). Load it now
+        // — while the confirmation session is still live — so the user is never
+        // sent through POS-type selection again.
+        const cloud = await readCloudStoreConfig()
+        if (!active) return
+        if (cloud.status === 'found' && cloud.store) {
+          try {
+            await restoreStoreFromCloud(user.id, {
+              name: cloud.store.name,
+              posType: cloud.store.posType,
+            })
+            await signOutSupabase()
+            refresh()
+            toast.success('Existing workspace loaded', {
+              description:
+                'Your saved POS type was restored. Import a backup if your products and orders are on another device.',
+            })
+            navigate('/', { replace: true })
+            return
+          } catch (err) {
+            toast.error(
+              err instanceof Error ? err.message : 'Could not restore the existing workspace.'
+            )
+            // Fall through to setup only if no local workspace was created.
+          }
         }
 
         // NOTE: the transient Supabase session is intentionally kept until the

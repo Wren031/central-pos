@@ -90,6 +90,21 @@ function parseBackup(json: string) {
   return result.data
 }
 
+export interface BackupMeta {
+  store: { name: string; posType: string }
+  accountEmail: string
+}
+
+/**
+ * Read only the workspace metadata from a backup file WITHOUT importing it.
+ * Used by the restore screen to recreate the correct workspace/POS type when
+ * the cloud has no store row (e.g. legacy accounts or an offline first login).
+ */
+export function readBackupMeta(json: string): BackupMeta {
+  const backup = parseBackup(json)
+  return { store: backup.store, accountEmail: backup.accountEmail }
+}
+
 /**
  * Merge a v2 backup into the CURRENT account + store.
  *

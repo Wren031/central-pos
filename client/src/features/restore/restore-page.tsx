@@ -34,11 +34,15 @@ import {
 import { Brand } from '@/components/common/brand'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { getPosType } from '@/lib/pos-types'
-import { downloadExport, exportDatabase } from '@/services/export-service'
-import { importDatabase, readFileAsText } from '@/services/import-service'
+import { exportDatabase, downloadExport } from '@/services/export-service'
+import { importDatabase, readBackupMeta, readFileAsText } from '@/services/import-service'
 import {
   clearRestoreContext,
   readRestoreContextFor,
+  releaseRetainedSession,
+  retryCloudStoreConfig,
+  stashRestoreContext,
+  type CloudStoreConfig,
   type RestoreContext,
 } from '@/services/cloud-store-config-service'
 import { restoreStoreFromCloud } from '@/lib/repos'
@@ -56,13 +60,16 @@ import { useAuth } from '@/state/auth-context'
  * Restoring never changes the account's POS type and never creates a duplicate.
  */
 export function RestorePage() {
-  const { user, store, refresh } = useAuth()
+  const { user, store, refresh, logout } = useAuth()
   const online = useOnlineStatus()
   const navigate = useNavigate()
 
   // Read once; the context is a one-shot hand-off from the login flow, scoped to
   // this account so a stale hand-off can never be reused by someone else.
   const [ctx] = React.useState<RestoreContext | null>(() => readRestoreContextFor(user?.email))
+  const [cloud, setCloud] = React.useState<CloudStoreConfig | null>(() => ctx?.cloud ?? null)
+  const [retryError, setRetryError] = React.useState<string | null>(() => ctx?.error ?? null)
+  const [retrying, setRetrying] = React.useState(false)
   const [busy, setBusy] = React.useState<'recover' | 'export' | 'import' | null>(null)
   const [pendingFile, setPendingFile] = React.useState<{ name: string; text: string } | null>(null)
   const fileRef = React.useRef<HTMLInputElement>(null)
@@ -70,15 +77,53 @@ export function RestorePage() {
   // Already has a workspace (e.g. refreshed here before) → nothing to restore.
   if (user && store) return <Navigate to="/" replace />
 
-  const cloud = ctx?.cloud ?? null
   const cloudStore = cloud?.store ?? null
   const hasCloudStore = Boolean(cloudStore?.posType)
+  const unavailable = cloud?.status === 'unavailable'
   const posDef = hasCloudStore ? getPosType(cloudStore!.posType) : null
 
-  function finish() {
+  async function finish() {
     clearRestoreContext()
+    await releaseRetainedSession()
     refresh()
     navigate('/', { replace: true })
+  }
+
+  /** Re-check the cloud after a timeout/network failure — no re-login needed. */
+  async function handleRetry() {
+    if (!user) return
+    setRetrying(true)
+    setRetryError(null)
+    try {
+      const next = await retryCloudStoreConfig()
+      setCloud(next)
+      if (next.status === 'unavailable') {
+        setRetryError(next.error)
+      } else {
+        stashRestoreContext({
+          email: user.email,
+          cloud: next,
+          hasCloudStore: Boolean(next.store),
+          unavailable: false,
+          error: null,
+        })
+      }
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : 'Could not reach the server.')
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  /**
+   * Last-resort escape: the in-memory verification session only survives while
+   * this tab stays open. After a reload a retry cannot authenticate, so offer a
+   * clean sign-in instead of leaving the user stuck.
+   */
+  async function signInAgain() {
+    if (!user) return
+    await logout()
+    navigate('/login', { replace: true })
   }
 
   /** Create the local workspace from the account's cloud configuration. */
@@ -93,7 +138,7 @@ export function RestorePage() {
       toast.success(`${getPosType(cloudStore.posType).name} restored`, {
         description: 'Your workspace type is back. Restore a backup to add products and orders.',
       })
-      finish()
+      await finish()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not restore the workspace.')
     } finally {
@@ -104,7 +149,8 @@ export function RestorePage() {
   /**
    * Explicit empty workspace. If the account's POS type is known it is used
    * as-is (never re-chosen). A brand-new account with no cloud config must pick
-   * once, so it goes to onboarding.
+   * once, so it goes to onboarding. While the cloud answer is unknown we refuse
+   * to create anything — the retry above resolves it first.
    */
   async function handleContinueEmpty() {
     if (!user) return
@@ -112,7 +158,14 @@ export function RestorePage() {
       await handleRecoverFromCloud()
       return
     }
+    if (unavailable) {
+      toast.error('We could not verify your saved workspace.', {
+        description: 'Check your connection and use Retry before creating a new one.',
+      })
+      return
+    }
     clearRestoreContext()
+    await releaseRetainedSession()
     navigate('/onboarding', { replace: true })
   }
 
@@ -151,20 +204,25 @@ export function RestorePage() {
     if (!pendingFile || !user) return
     setBusy('import')
     try {
+      // Read the backup's own workspace metadata first. This is what fixes the
+      // old dead-end: when the cloud has no store row, the POS type recorded in
+      // the backup is still authoritative, so no "sign in again" is needed.
+      const meta = readBackupMeta(pendingFile.text)
+
       // A backup may carry a store config but business rows need a local store
-      // to attach to. Create it first (using the known POS type, or the type
-      // recorded inside the backup when the cloud had none).
+      // to attach to. Create it first (using the cloud POS type when known, or
+      // the type recorded inside the backup).
       let targetStore = store
       if (!targetStore) {
-        const posType = cloudStore?.posType
+        const posType = cloudStore?.posType ?? meta.store.posType
         if (!posType) {
-          toast.error('Set up a POS type before restoring this backup.', {
-            description: 'Sign in again after your workspace type has synced, or choose a type.',
+          toast.error('This backup does not record a POS workspace type.', {
+            description: 'Export a fresh backup from the device that has your data.',
           })
           return
         }
         targetStore = await restoreStoreFromCloud(user.id, {
-          name: cloudStore?.name ?? user.businessName,
+          name: cloudStore?.name ?? meta.store.name ?? user.businessName,
           posType,
         })
       }
@@ -181,7 +239,7 @@ export function RestorePage() {
       toast.success('Backup restored', {
         description: added ? `Added ${added}.` : 'This backup is already on the device.',
       })
-      finish()
+      await finish()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Import failed.')
     } finally {
@@ -235,13 +293,56 @@ export function RestorePage() {
             </Card>
           )}
 
-          {!cloudStore && (
+          {unavailable && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">We couldn&apos;t verify your saved workspace yet.</p>
+                  <p className="mt-1 leading-relaxed">
+                    {retryError ??
+                      cloud?.error ??
+                      'The server did not answer. Your existing workspace was not replaced.'}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => void handleRetry()}
+                    disabled={retrying || busy !== null}
+                  >
+                    {retrying ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                    {retrying ? 'Checking…' : 'Retry check'}
+                  </Button>
+                  {retryError?.toLowerCase().includes('session expired') && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 ml-2"
+                      onClick={() => void signInAgain()}
+                      disabled={retrying || busy !== null}
+                    >
+                      Sign in again
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!cloudStore && !unavailable && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               <span>
-                We couldn&apos;t read a saved workspace for this account. If it was set up on another
-                device, sign in once there while online so its workspace type syncs, then try again.
-                You can also restore from a backup file.
+                This account has no saved workspace in the cloud. If you set it up on another
+                device, export a backup there and restore it here — or continue with an empty
+                workspace and choose a POS type.
               </span>
             </div>
           )}
@@ -343,12 +444,21 @@ export function RestorePage() {
           </div>
 
           <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-between">
-            <Button variant="ghost" onClick={() => void handleContinueEmpty()} disabled={busy !== null}>
+            <Button
+              variant="ghost"
+              onClick={() => void handleContinueEmpty()}
+              disabled={busy !== null || retrying || unavailable}
+              title={
+                unavailable
+                  ? 'Retry the workspace check before creating a new workspace'
+                  : undefined
+              }
+            >
               Continue with an empty workspace
               <ArrowRight className="size-4" />
             </Button>
             <p className="self-center text-[11px] text-muted-foreground">
-              Your POS type is kept either way.
+              {unavailable ? 'Your existing workspace will never be replaced.' : 'Your POS type is kept either way.'}
             </p>
           </div>
         </div>

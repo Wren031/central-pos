@@ -120,7 +120,7 @@ export function LoginPage() {
                   />
                   <Input
                     type="email"
-                    placeholder="juan@bbqhouse.ph"
+                    placeholder="johndo@gmail.com"
                     autoComplete="email"
                     autoFocus
                     className="h-11 pl-9"

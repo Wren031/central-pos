@@ -16,6 +16,8 @@ import {
   EMPTY_CLOUD_CONFIG,
   clearRestoreContext,
   readCloudStoreConfig,
+  readCloudStoreConfigWithCredentials,
+  releaseRetainedSession,
   saveCloudStoreConfig,
   stashRestoreContext,
   withTransientSession,
@@ -237,7 +239,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Auth (verified email, no local record yet) we repair it online —
           // existing local accounts keep working fully offline.
           const healedResult = await healLocalAccountViaSupabase(email, password)
-          if (!healedResult) throw err
+          if (!healedResult) {
+            // No local identity for this account on THIS device. Offline we
+            // genuinely cannot restore it — say so instead of a generic error.
+            if (!isOnline()) {
+              throw new Error(
+                'This account is not set up on this device yet. Connect to the internet to restore it, or sign in on the device where it was created.'
+              )
+            }
+            throw err
+          }
           u = healedResult.user
           healed = true
           healedCloud = healedResult.cloud
@@ -249,6 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (outcome === 'suspended') {
             await markUserAccountStatus(u.id, 'suspended', nowIso())
             await repoLogout()
+            await releaseRetainedSession()
             throw new AccountSuspendedError()
           }
           if (outcome === 'active') {
@@ -263,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // blocks access, so disconnecting never restores a suspended account.
         if (u.accountStatus === 'suspended') {
           await repoLogout()
+          await releaseRetainedSession()
           throw new AccountSuspendedError()
         }
 
@@ -271,11 +284,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // signup. Surface the restore options instead of the onboarding wizard.
         //
         // The same is true when the local identity exists but the workspace does
-        // not (the user reached the restore screen before and came back later).
-        // Only claim "existing" when the account really WAS configured: a never
-        // onboarded account must still go through onboarding.
+        // not (the user reached the restore screen before and came back later),
+        // and when the cloud lookup FAILED: "unknown" is not "new account".
         let needsRestore = healed
         let restoreCloud: CloudStoreConfig | null = healedCloud
+        let restoreError: string | null = healedCloud?.error ?? null
 
         if (!needsRestore) {
           const localStore = getStoreByUser(u.id)
@@ -284,19 +297,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // account's POS type. Fire-and-forget — never delays sign-in.
             void syncConfigToCloud(u.email, password, localStore.name, localStore.posType)
           } else if (isOnline()) {
-            const cloud = await withTransientSession(u.email, password, readCloudStoreConfig)
-            if (cloud?.found && cloud.store) {
+            const cloud = await readCloudStoreConfigWithCredentials(u.email, password, {
+              retainOnFailure: true,
+            })
+            if (cloud.status === 'found' && cloud.store) {
               needsRestore = true
               restoreCloud = cloud
+            } else if (cloud.status === 'unavailable') {
+              // The server did not answer. Do NOT assume this is a new
+              // workspace — send the user to /restore with a retry.
+              needsRestore = true
+              restoreCloud = cloud
+              restoreError = cloud.error
             }
+          } else {
+            // Offline with no local workspace: cannot verify whether this
+            // account already has one, so never create a new one implicitly.
+            needsRestore = true
+            restoreCloud = {
+              ...EMPTY_CLOUD_CONFIG,
+              status: 'unavailable',
+              error: 'You are offline, so the saved workspace could not be verified.',
+            }
+            restoreError = restoreCloud.error
           }
         }
 
         if (needsRestore) {
+          const unavailable = restoreCloud?.status === 'unavailable'
           stashRestoreContext({
             email: u.email,
             cloud: restoreCloud ?? EMPTY_CLOUD_CONFIG,
             hasCloudStore: Boolean(restoreCloud?.store),
+            unavailable,
+            error: restoreError ?? restoreCloud?.error ?? null,
           })
         }
 
@@ -322,8 +356,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = React.useCallback(async () => {
     await repoLogout()
-    // Never carry a half-finished restore hand-off across sign-outs.
+    // Never carry a half-finished restore hand-off (or its in-memory
+    // verification session) across sign-outs.
     clearRestoreContext()
+    await releaseRetainedSession()
     refresh()
   }, [refresh])
 
