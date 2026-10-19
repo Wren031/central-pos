@@ -1,4 +1,5 @@
 import { ArrowRight, Check, Download, Sparkles } from 'lucide-react'
+import heroBackground from '@/assets/unipos.jpeg'
 import { Button } from '@/components/ui/button'
 import { CheckoutDemo } from '../showcase/checkout-demo'
 import { CTA_BENEFITS, REGISTER_URL, SITE } from '../site'
@@ -7,13 +8,51 @@ import { Reveal } from './reveal'
 
 export function Hero() {
   return (
-    <section id="top" className="relative scroll-mt-20 overflow-hidden">
-      <div
+    <section id="top" className="relative -mt-16 scroll-mt-20 overflow-hidden">
+      {/*
+        Storefront photo behind the whole hero. Decorative only — the copy and
+        the POS demo carry the meaning, so the image is hidden from assistive
+        technology and framed by scrims that keep text readable.
+      */}
+      <img
+        src={heroBackground}
+        alt=""
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,oklch(0.511_0.262_277/0.12),transparent)]"
+        fetchPriority="high"
+        decoding="async"
+        className="absolute inset-0 size-full object-cover object-center brightness-110"
       />
 
-      <Container className="relative grid max-w-7xl items-center gap-12 py-14 sm:py-20 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 lg:py-24">
+      {/* Base scrim: knocks the photo back just enough to keep text contrast. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-background/40 lg:bg-background/0 dark:bg-background/60"
+      />
+
+      {/* Horizontal fade: readable copy on the left, photo open toward the demo. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-background/5 lg:from-background/75 lg:via-background/25 lg:to-transparent dark:from-background dark:via-background/85 dark:to-background/40"
+      />
+
+      {/* Blend the photo into the next section instead of ending on a hard edge. */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-background"
+      />
+
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,oklch(0.66_0.21_277/0.16),transparent)]"
+      />
+
+      {/* Soften the photo where the transparent nav sits so links stay readable. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-background/70 to-transparent dark:from-background/80"
+      />
+
+      <Container className="relative grid max-w-7xl items-center gap-12 pt-24 pb-10 sm:pt-28 sm:pb-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 lg:pt-32 lg:pb-16">
         <div>
           <Reveal>
             <p className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">

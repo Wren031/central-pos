@@ -44,7 +44,11 @@ const PAPER_W = 1.0
 const PAPER_H = 1.55
 
 const SCANNER_REST = new THREE.Vector3(1.55, 1.4, 1.1)
-const SCANNER_SCAN = new THREE.Vector3(-2.0, 0.1, 1.9)
+/**
+ * Scan pose sits in front of the product (higher Z than the barcode face) so
+ * the beam lands square on the front panel instead of grazing past it.
+ */
+const SCANNER_SCAN = new THREE.Vector3(-1.7, -0.35, 2.55)
 const SCANNER_REST_TARGET = new THREE.Vector3(1.0, 1.05, 0.4)
 
 const CARD_OUT = new THREE.Vector3(3.6, 0.8, 1.2)
@@ -336,24 +340,47 @@ function AnimatedScene({ step }: { step: number }) {
       </group>
 
       {/* ---------- Handheld scanner ---------- */}
+      {/*
+        The outer group is driven by `lookAt` in useFrame, so the model itself
+        lives in an inner group that is flipped 180° on Y. That puts the lens
+        (and emitter) on the side of the scanner that faces the barcode plane.
+      */}
       <group ref={scanner} position={SCANNER_REST}>
-        <RoundedBox args={[0.24, 0.46, 0.24]} radius={0.06} smoothness={3}>
-          <meshStandardMaterial color="#232834" roughness={0.4} metalness={0.3} />
-        </RoundedBox>
-        <RoundedBox args={[0.34, 0.2, 0.34]} radius={0.05} smoothness={3} position={[0, -0.3, 0.04]}>
-          <meshStandardMaterial color="#2c313d" roughness={0.35} metalness={0.35} />
-        </RoundedBox>
-        <RoundedBox args={[0.3, 0.16, 0.22]} radius={0.05} smoothness={3} position={[0, 0.3, 0]}>
-          <meshStandardMaterial color="#4f46e5" roughness={0.35} metalness={0.2} />
-        </RoundedBox>
-        <object3D ref={emitter} position={[0, -0.34, 0.1]} />
-        <pointLight
-          ref={beamLight}
-          position={[0, -0.42, 0.18]}
-          intensity={0}
-          distance={3}
-          color="#ff5a5a"
-        />
+        <group rotation-y={Math.PI}>
+          <RoundedBox args={[0.24, 0.46, 0.24]} radius={0.06} smoothness={3}>
+            <meshStandardMaterial color="#232834" roughness={0.4} metalness={0.3} />
+          </RoundedBox>
+          <RoundedBox
+            args={[0.34, 0.2, 0.34]}
+            radius={0.05}
+            smoothness={3}
+            position={[0, -0.3, 0.04]}
+          >
+            <meshStandardMaterial color="#2c313d" roughness={0.35} metalness={0.35} />
+          </RoundedBox>
+          <RoundedBox args={[0.3, 0.16, 0.22]} radius={0.05} smoothness={3} position={[0, 0.3, 0]}>
+            <meshStandardMaterial color="#4f46e5" roughness={0.35} metalness={0.2} />
+          </RoundedBox>
+          {/* Lens window on the head — after the Y flip this faces the product */}
+          <mesh position={[0, 0.3, -0.112]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, 0.02, 24]} />
+            <meshStandardMaterial
+              color="#2b1020"
+              emissive="#ff4d4d"
+              emissiveIntensity={1.4}
+              roughness={0.25}
+              metalness={0.4}
+            />
+          </mesh>
+          <object3D ref={emitter} position={[0, 0.3, -0.14]} />
+          <pointLight
+            ref={beamLight}
+            position={[0, 0.32, -0.2]}
+            intensity={0}
+            distance={3}
+            color="#ff5a5a"
+          />
+        </group>
       </group>
 
       <mesh ref={beam} visible={false}>
@@ -415,7 +442,7 @@ function AnimatedScene({ step }: { step: number }) {
 
       {/* ---------- Receipt paper (clipped so it feeds out of the slot) ---------- */}
       <group ref={paper} position={[PRINTER_POS[0], SLOT_Y, PRINTER_POS[2] + 0.12]}>
-        {/* Soft drop shadow so the white paper reads against the light stage */}
+        {/* Soft shadow so the white paper separates from the stage */}
         <mesh position={[0.02, PAPER_H / 2 - 0.02, -0.008]}>
           <planeGeometry args={[PAPER_W + 0.04, PAPER_H + 0.04]} />
           <meshBasicMaterial

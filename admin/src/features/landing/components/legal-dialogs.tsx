@@ -21,7 +21,7 @@ export function LegalDialogs({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="landing-surface max-h-[80vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{doc === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}</DialogTitle>
           <DialogDescription asChild>

@@ -53,7 +53,7 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-2.5 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-2.5">
       <div className="flex items-center gap-1.5">
         <span className="text-primary">{icon}</span>
         <span className="text-[11px] font-semibold text-foreground">{label}</span>
@@ -65,7 +65,7 @@ function Panel({
 
 function RegisterVisual() {
   return (
-    <Shell tint="bg-primary/[0.04]">
+    <Shell tint="bg-primary/[0.08]">
       <Panel icon={<UserPlus className="size-3.5" aria-hidden />} label="Store account">
         <div className="space-y-1.5">
           <Pop delay={0.05}>
@@ -80,7 +80,7 @@ function RegisterVisual() {
             </div>
           </Pop>
           <Pop delay={0.3}>
-            <p className="flex items-center gap-1 pt-0.5 text-[10px] font-medium text-emerald-600">
+            <p className="flex items-center gap-1 pt-0.5 text-[10px] font-medium text-emerald-400">
               <Check className="size-3" aria-hidden />
               30-day trial active
             </p>
@@ -95,7 +95,7 @@ const POS_TYPES = ['BBQ', 'Retail', 'Grocery', 'Cafe', 'Pharmacy', 'General'] as
 
 function SetupVisual() {
   return (
-    <Shell tint="bg-violet-500/[0.05]">
+    <Shell tint="bg-violet-500/[0.1]">
       <Panel icon={<MonitorSmartphone className="size-3.5" aria-hidden />} label="Choose POS type">
         <div className="grid grid-cols-3 gap-1.5">
           {POS_TYPES.map((type, index) => (
@@ -127,7 +127,7 @@ const CATALOG = [
 
 function ProductsVisual() {
   return (
-    <Shell tint="bg-emerald-500/[0.05]">
+    <Shell tint="bg-emerald-500/[0.1]">
       <Panel icon={<Package className="size-3.5" aria-hidden />} label="Catalog">
         <div className="grid grid-cols-2 gap-1.5">
           {CATALOG.map((item, index) => (
@@ -149,8 +149,8 @@ function ProductsVisual() {
 function CheckoutVisual() {
   const reduceMotion = useReducedMotion()
   return (
-    <Shell tint="bg-amber-500/[0.06]">
-      <div className="relative overflow-hidden rounded-lg border border-border bg-card p-2.5 shadow-sm">
+    <Shell tint="bg-amber-500/[0.1]">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card p-2.5">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
             <ScanLine className="size-3.5 text-primary" aria-hidden />
@@ -193,12 +193,12 @@ function CheckoutVisual() {
 
 function ReceiptVisual() {
   return (
-    <Shell tint="bg-sky-500/[0.05]">
+    <Shell tint="bg-sky-500/[0.1]">
       <Panel icon={<Printer className="size-3.5" aria-hidden />} label="Thermal printer">
         <div className="mx-auto w-4/5 overflow-hidden">
           <div className="h-1.5 rounded-t bg-muted-foreground/25" />
           <Pop delay={0.15}>
-            <div className="space-y-[3px] rounded-b border border-t-0 border-border bg-white p-1.5">
+            <div className="space-y-[3px] rounded-b border border-t-0 border-slate-300 bg-white p-1.5">
               <p className="text-center text-[8px] font-bold text-slate-800">UNIPOS DEMO STORE</p>
               <div className="border-t border-dashed border-slate-200" />
               <div className="flex justify-between text-[7px] text-slate-500">

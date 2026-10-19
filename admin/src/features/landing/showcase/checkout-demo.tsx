@@ -1,9 +1,7 @@
 import * as React from 'react'
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'motion/react'
-import { ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react'
 import { cn } from 'cn'
 import { peso } from '@/lib/format'
-import { Button } from '@/components/ui/button'
 import { CHECKOUT_DURATIONS, CHECKOUT_STEPS } from './steps'
 import { useCheckoutSequence } from './use-checkout-sequence'
 import { PosScreen2D } from './pos-screen-2d'
@@ -99,12 +97,6 @@ export function CheckoutDemo() {
 
   return (
     <div ref={frameRef} className="relative w-full">
-      {/* Soft halo, kept subtle so it never reads as a gradient wash */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-primary/[0.07] blur-3xl"
-      />
-
       <div className="[perspective:1600px]">
         <div
           ref={tiltRef}
@@ -112,18 +104,6 @@ export function CheckoutDemo() {
           onPointerLeave={handlePointerLeave}
           className="relative aspect-[16/10] w-full transition-transform duration-500 ease-out [transform:rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] will-change-transform"
         >
-          {/*
-            A tinted stage behind the 3D scene. Light-coloured hardware would
-            otherwise disappear against the near-white page, and it gives the
-            composition a deliberate frame instead of floating in whitespace.
-          */}
-          <div
-            aria-hidden
-            className="absolute inset-0 overflow-hidden rounded-2xl bg-white/70 ring-1 ring-border/70 ring-inset"
-          >
-            <div className="absolute inset-x-0 top-0 h-2/3 bg-[radial-gradient(70%_100%_at_50%_0%,oklch(0.62_0.19_277/0.14),transparent)]" />
-          </div>
-
           {/* 3D scene, cross-faded in over the 2D preview */}
           {canRender3d && (
             <div
@@ -179,8 +159,8 @@ export function CheckoutDemo() {
         onFocusCapture={sequence.pause}
       >
         {/*
-          Reduced-motion visitors drive the workflow by hand: no autoplay, no
-          timer, no transport — just the step chips and previous/next.
+          Reduced-motion visitors step through by hand: no autoplay and no
+          timer, just the step chips.
         */}
         {!reduceMotion && (
           <div className="h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
@@ -192,47 +172,6 @@ export function CheckoutDemo() {
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={sequence.prev}
-              aria-label="Previous step"
-            >
-              <ChevronLeft />
-            </Button>
-            {!reduceMotion && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={sequence.toggle}
-                aria-label={sequence.playing ? 'Pause the demonstration' : 'Play the demonstration'}
-              >
-                {sequence.playing ? <Pause /> : <Play />}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={sequence.next}
-              aria-label="Next step"
-            >
-              <ChevronRight />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={sequence.replay}
-              aria-label="Replay the demonstration from the start"
-            >
-              <RotateCcw />
-            </Button>
-          </div>
-
           <ol className="flex flex-wrap items-center gap-1.5" aria-label="Checkout steps">
             {CHECKOUT_STEPS.map((item, index) => (
               <li key={item.id}>
@@ -241,10 +180,10 @@ export function CheckoutDemo() {
                   onClick={() => sequence.goTo(index)}
                   aria-current={index === step ? 'step' : undefined}
                   className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    'rounded-full border px-3 py-1 text-xs font-medium backdrop-blur-sm transition-colors',
                     index === step
-                      ? 'border-primary/40 bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+                      ? 'border-primary/50 bg-primary/15 text-primary'
+                      : 'border-border bg-background/70 text-foreground/75 hover:bg-muted hover:text-foreground'
                   )}
                 >
                   <span className="mr-1 tabular-nums opacity-60">{index + 1}</span>

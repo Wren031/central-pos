@@ -8,10 +8,10 @@ export function CtaSection() {
   return (
     <section className="scroll-mt-20 border-t border-border bg-muted/60 py-16 sm:py-20">
       <Container>
-        <Reveal className="relative overflow-hidden rounded-3xl border border-primary/15 bg-card px-6 py-14 text-center shadow-sm sm:px-12">
+        <Reveal className="relative overflow-hidden rounded-3xl border border-primary/20 bg-card px-6 py-14 text-center sm:px-12">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_120%_at_50%_0%,oklch(0.511_0.262_277/0.1),transparent)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_120%_at_50%_0%,oklch(0.66_0.21_277/0.16),transparent)]"
           />
           <div className="relative">
             <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl">

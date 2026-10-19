@@ -15,7 +15,7 @@ function FaqItem({ question, answer, index }: { question: string; answer: string
   return (
     <div
       className={cn(
-        'rounded-xl border bg-card shadow-xs transition-colors',
+        'rounded-xl border bg-card transition-colors',
         open ? 'border-primary/30' : 'border-border/70'
       )}
     >

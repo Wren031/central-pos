@@ -23,7 +23,7 @@ export function ReceiptCard({ show }: { show: boolean }) {
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           className="pointer-events-none w-full"
         >
-          <div className="overflow-hidden rounded-lg border border-border bg-white shadow-xl shadow-slate-900/10">
+          <div className="overflow-hidden rounded-lg border border-slate-300 bg-white">
             <div className="flex items-center gap-1.5 border-b border-dashed border-slate-200 bg-slate-50 px-3 py-1.5">
               <Printer className="size-3 text-emerald-600" aria-hidden />
               <span className="text-[10px] font-semibold text-emerald-600">Printed</span>

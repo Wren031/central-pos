@@ -37,7 +37,7 @@ export function PosScreen2D({ step }: { step: number }) {
   const lines = cartLines(step)
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-[#f2f4f9] shadow-sm">
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-[#0f1117]">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
@@ -53,7 +53,7 @@ export function PosScreen2D({ step }: { step: number }) {
             </p>
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-600">
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
           <span className="size-1.5 rounded-full bg-emerald-500" />
           Offline ready
         </span>
@@ -99,7 +99,7 @@ export function PosScreen2D({ step }: { step: number }) {
           </div>
 
           {step === 1 && (
-            <div className="absolute inset-x-2 top-2 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">
+            <div className="absolute inset-x-2 top-2 rounded-lg bg-red-500/10 px-2 py-1 text-[10px] font-semibold text-red-400">
               Scanning barcode…
             </div>
           )}
@@ -172,8 +172,8 @@ export function PosScreen2D({ step }: { step: number }) {
 
       {/* Success overlay */}
       {step >= 3 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0c1020]/45 p-4">
-          <div className="w-full max-w-[15rem] rounded-xl bg-card p-4 text-center shadow-lg">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-[15rem] rounded-xl border border-border bg-popover p-4 text-center">
             <span
               className={cn(
                 'mx-auto flex size-11 items-center justify-center rounded-full',

@@ -59,13 +59,13 @@ export function PricingSection() {
             return (
               <RevealItem key={plan.id} index={index} className="relative h-full">
                 {highlighted && (
-                  <span className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
+                  <span className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[11px] font-semibold text-primary-foreground">
                     Most popular
                   </span>
                 )}
                 <Card
                   className={cn(
-                    'h-full transition-[transform,box-shadow] duration-300 ease-out motion-safe:hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5',
+                    'h-full transition-shadow duration-300 hover:ring-primary/35',
                     highlighted && 'ring-2 ring-primary/40'
                   )}
                 >

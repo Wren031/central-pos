@@ -11,18 +11,19 @@ import { DEMO_CATALOG, DEMO_ITEMS, DEMO_SCANNED_PRODUCT, DEMO_STORE, DEMO_TOTALS
 const FONT_STACK = '"Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 
 const C = {
-  primary: '#4f46e5',
-  primarySoft: '#eceefd',
-  fg: '#151824',
-  sub: '#5b6172',
-  faint: '#98a0b3',
-  border: '#e6e9f0',
-  panel: '#f4f6fa',
-  card: '#ffffff',
-  success: '#0ea472',
-  successSoft: '#e4f6ef',
-  scan: '#ef4444',
-  scanSoft: '#fdecec',
+  bg: '#0f1117',
+  primary: '#7c6cff',
+  primarySoft: 'rgba(124,108,255,0.18)',
+  fg: '#f2f3f7',
+  sub: '#b6bac7',
+  faint: '#8a90a2',
+  border: '#2c2f3a',
+  panel: '#15171d',
+  card: '#1b1e26',
+  success: '#34d399',
+  successSoft: 'rgba(16,185,129,0.16)',
+  scan: '#f87171',
+  scanSoft: 'rgba(239,68,68,0.16)',
 } as const
 
 const TILE_COLORS = ['#f59e0b', '#f97316', '#eab308', '#84cc16', '#22c55e', '#38bdf8'] as const
@@ -147,7 +148,7 @@ export function drawScreen(
   const s = w / 1024
 
   // Backdrop
-  ctx.fillStyle = '#f2f4f9'
+  ctx.fillStyle = C.bg
   ctx.fillRect(0, 0, w, h)
 
   /* ---------- Top bar ---------- */
@@ -161,7 +162,7 @@ export function drawScreen(
     size: 19,
     scale: s,
     weight: 700,
-    color: '#ffffff',
+    color: '#12102a',
     align: 'center',
     baseline: 'middle',
   })
@@ -345,7 +346,7 @@ export function drawScreen(
       size: 17,
       scale: s,
       weight: 700,
-      color: paid || charge ? '#ffffff' : C.primary,
+      color: paid ? '#ffffff' : charge ? '#12102a' : C.primary,
       align: 'center',
       baseline: 'middle',
     }
@@ -364,7 +365,7 @@ export function drawScreen(
   }
 
   if (step === 3) {
-    ctx.fillStyle = 'rgba(12,16,32,0.45)'
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
     ctx.fillRect(0, 0, w, h)
     const bw = 460 * s
     const bh = 250 * s
@@ -398,7 +399,7 @@ export function drawScreen(
   }
 
   if (step >= 4) {
-    ctx.fillStyle = 'rgba(12,16,32,0.45)'
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
     ctx.fillRect(0, 0, w, h)
     const bw = 460 * s
     const bh = 250 * s

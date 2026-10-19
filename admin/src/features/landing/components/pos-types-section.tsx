@@ -45,7 +45,7 @@ export function PosTypesSection() {
               <RevealItem key={type.id} index={index} className="h-full">
                 <Card
                   data-size="sm"
-                  className="h-full transition-[transform,box-shadow] duration-300 ease-out motion-safe:hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5"
+                  className="h-full transition-shadow duration-300 hover:ring-primary/35"
                 >
                   <CardHeader>
                     <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">

@@ -36,7 +36,7 @@ export function LandingHeader() {
         'sticky top-0 z-50 border-b transition-colors duration-300',
         scrolled
           ? 'border-border bg-background/85 backdrop-blur-md'
-          : 'border-transparent bg-background/60 backdrop-blur-sm'
+          : 'border-transparent bg-transparent'
       )}
     >
       <Container className="flex h-16 items-center justify-between gap-4">
@@ -45,7 +45,7 @@ export function LandingHeader() {
           className="flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           aria-label={`${SITE.name} home`}
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Store className="size-[18px]" aria-hidden />
           </span>
           <span className="text-base font-semibold tracking-tight text-foreground">{SITE.name}</span>
@@ -56,7 +56,10 @@ export function LandingHeader() {
             <a
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className={cn(
+                'rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground',
+                scrolled ? 'text-muted-foreground' : 'text-foreground/80'
+              )}
             >
               {link.label}
             </a>

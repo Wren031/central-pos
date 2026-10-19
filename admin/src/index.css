@@ -103,15 +103,46 @@
 /*
  * Landing page surface.
  *
- * The public marketing page sits on a soft, slightly cool grey rather than the
- * near-white used by the admin console, so white cards and the 3D hardware
- * separate cleanly from the page. Scoped to this class so the dashboard keeps
- * its own tokens untouched — every `bg-background` / `hover:bg-muted` inside
- * the landing tree picks these up automatically.
+ * The public marketing page runs a dark, near-black palette that is scoped to
+ * this class so the admin console keeps its own light tokens untouched — every
+ * `bg-background` / `bg-card` / `border-border` / button inside the landing
+ * tree picks these up automatically.
  */
 .landing-surface {
-  --background: oklch(0.966 0.005 264);
-  --muted: oklch(0.941 0.008 264);
+  color-scheme: dark;
+
+  --background: oklch(0.145 0.003 264);
+  --foreground: oklch(0.975 0.002 264);
+  --card: oklch(0.19 0.004 264);
+  --card-foreground: oklch(0.975 0.002 264);
+  --popover: oklch(0.2 0.004 264);
+  --popover-foreground: oklch(0.975 0.002 264);
+  --primary: oklch(0.66 0.21 277);
+  --primary-foreground: oklch(0.11 0.01 277);
+  --secondary: oklch(0.23 0.004 264);
+  --secondary-foreground: oklch(0.96 0.002 264);
+  --muted: oklch(0.21 0.004 264);
+  --muted-foreground: oklch(0.72 0.01 264);
+  --accent: oklch(0.26 0.02 277);
+  --accent-foreground: oklch(0.97 0 0);
+  --destructive: oklch(0.62 0.2 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.66 0.21 277);
+}
+
+/* Keep the document itself dark while the landing page is mounted so overscroll
+ * and the native scrollbar match the page instead of flashing white. */
+html:has(.landing-surface),
+body:has(.landing-surface) {
+  color-scheme: dark;
+  background-color: oklch(0.145 0.003 264);
+}
+
+/* The legal dialogs are portaled to the body, so their scrim needs to match the
+ * dark landing theme rather than the neutral default. */
+[data-slot='dialog-overlay']:has(+ [data-slot='dialog-content'].landing-surface) {
+  background-color: oklch(0 0 0 / 70%);
 }
 
 .dark {

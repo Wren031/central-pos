@@ -36,7 +36,7 @@ function DownloadCard({
   const href = releaseDownloadHref(release)
 
   return (
-    <Card className="h-full transition-shadow duration-300 hover:shadow-lg hover:shadow-primary/5">
+    <Card className="h-full transition-shadow duration-300 hover:ring-primary/35">
       <CardHeader>
         <div className="flex items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -140,7 +140,7 @@ export function DownloadSection() {
           )}
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
-            <Reveal className="rounded-xl border border-border/70 bg-card p-5 shadow-xs">
+            <Reveal className="rounded-xl border border-border/70 bg-card p-5">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Smartphone className="size-4 text-primary" aria-hidden />
                 Installing on Android
@@ -151,7 +151,7 @@ export function DownloadSection() {
                 <li>3. Tap Install, then open UniPOS and register your store.</li>
               </ol>
             </Reveal>
-            <Reveal delay={0.08} className="rounded-xl border border-border/70 bg-card p-5 shadow-xs">
+            <Reveal delay={0.08} className="rounded-xl border border-border/70 bg-card p-5">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <MonitorDown className="size-4 text-primary" aria-hidden />
                 Installing on Windows
