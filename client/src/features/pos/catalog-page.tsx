@@ -11,6 +11,7 @@ import {
   ScanLine,
   Search,
   ShoppingCart,
+  Tags,
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -122,6 +123,35 @@ function CartSummary({ onCheckout }: { onCheckout: () => void }) {
   )
 }
 
+function CategoryChip({
+  label,
+  selected,
+  accent,
+  onSelect,
+}: {
+  label: string
+  selected: boolean
+  accent: string
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+        selected
+          ? 'border-transparent text-white'
+          : 'bg-background text-muted-foreground hover:bg-muted'
+      )}
+      style={selected ? { backgroundColor: accent } : undefined}
+      aria-pressed={selected}
+    >
+      {label}
+    </button>
+  )
+}
+
 export function CatalogPage() {
   const { user, store } = useAuth()
   const { state } = useSubscription()
@@ -133,6 +163,7 @@ export function CatalogPage() {
   const [products, setProducts] = React.useState<Product[] | null>(null)
   const [query, setQuery] = React.useState('')
   const [category, setCategory] = React.useState<string>('All')
+  const [categoryOpen, setCategoryOpen] = React.useState(false)
   const [checkoutOpen, setCheckoutOpen] = React.useState(false)
   const [lastOrder, setLastOrder] = React.useState<Order | null>(null)
   const [receiptOpen, setReceiptOpen] = React.useState(false)
@@ -350,24 +381,65 @@ export function CatalogPage() {
 
       <div className="flex min-h-0 flex-1 gap-6">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="mb-4 flex shrink-0 flex-wrap gap-1.5 pb-1">
-            {categories.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(c)}
-                className={cn(
-                  'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  category === c
-                    ? 'border-transparent text-white'
-                    : 'bg-background text-muted-foreground hover:bg-muted'
-                )}
-                style={category === c ? { backgroundColor: posDef.theme.accent } : undefined}
-                aria-pressed={category === c}
-              >
-                {c}
-              </button>
-            ))}
+          <div className="mb-4 flex shrink-0 items-center">
+            {/* Mobile: icon-only filter that opens the full category list. */}
+            <Sheet open={categoryOpen} onOpenChange={setCategoryOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="relative shrink-0 sm:hidden"
+                  aria-label={
+                    category === 'All'
+                      ? 'Choose category'
+                      : `Choose category, current: ${category}`
+                  }
+                  title="Choose category"
+                >
+                  <Tags className="size-4" />
+                  {category !== 'All' && (
+                    <span
+                      className="absolute top-1.5 right-1.5 size-2 rounded-full"
+                      style={{ backgroundColor: posDef.theme.accent }}
+                      aria-hidden
+                    />
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl">
+                <SheetHeader className="border-b">
+                  <SheetTitle>Choose category</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-wrap gap-2 overflow-y-auto p-4">
+                  {categories.map((c) => (
+                    <CategoryChip
+                      key={c}
+                      label={c}
+                      selected={category === c}
+                      accent={posDef.theme.accent}
+                      onSelect={() => {
+                        setCategory(c)
+                        setCategoryOpen(false)
+                      }}
+                    />
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* Tablet/desktop: category pills. */}
+            <div className="hidden flex-wrap gap-1.5 pb-1 sm:flex">
+              {categories.map((c) => (
+                <CategoryChip
+                  key={c}
+                  label={c}
+                  selected={category === c}
+                  accent={posDef.theme.accent}
+                  onSelect={() => setCategory(c)}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-24 lg:pb-4">
