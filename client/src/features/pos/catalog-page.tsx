@@ -50,41 +50,46 @@ function CartLines() {
   return (
     <div className="space-y-2">
       {items.map((it) => (
-        <div key={it.productId} className="flex items-center gap-2 rounded-lg border p-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{it.name}</p>
-            <p className="text-xs text-muted-foreground tabular-nums">
+        <div
+          key={it.productId}
+          className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-xl border bg-background px-2.5 py-2"
+        >
+          <div className="min-w-0 self-center">
+            <p className="truncate text-sm font-medium leading-tight">{it.name}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
               {peso(it.price)} × {formatQty(it.qty, it.unit)} = {peso(it.price * it.qty)}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1 self-center">
             <Button
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
+              className="shrink-0"
               onClick={() => decrement(it.productId)}
               aria-label={`Decrease ${it.name}`}
             >
-              <Minus className="size-3" />
+              <Minus className="size-3.5" />
             </Button>
-            <span className="w-5 text-center text-sm tabular-nums">{it.qty}</span>
+            <span className="w-6 text-center text-sm font-medium tabular-nums">{it.qty}</span>
             <Button
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
+              className="shrink-0"
               onClick={() => increment(it.productId)}
               disabled={it.qty >= it.maxStock}
               aria-label={`Increase ${it.name}`}
             >
-              <Plus className="size-3" />
+              <Plus className="size-3.5" />
             </Button>
           </div>
           <Button
             variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:text-destructive"
+            size="icon-sm"
+            className="shrink-0 self-center text-muted-foreground hover:text-destructive"
             onClick={() => remove(it.productId)}
             aria-label={`Remove ${it.name}`}
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-4" />
           </Button>
         </div>
       ))}
@@ -92,26 +97,40 @@ function CartLines() {
   )
 }
 
-function CartSummary({ onCheckout }: { onCheckout: () => void }) {
+function CartSummary({
+  onCheckout,
+  variant = 'card',
+}: {
+  onCheckout: () => void
+  variant?: 'card' | 'sheet'
+}) {
   const { items, subtotal, clear } = useCart()
   return (
-    <div className="space-y-3 border-t p-4">
-      <div className="flex items-center justify-between text-sm">
+    <div
+      className={cn(
+        'mt-auto shrink-0 space-y-3 border-t bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/80',
+        variant === 'card'
+          ? 'rounded-b-xl shadow-[0_-6px_18px_-14px_rgba(0,0,0,0.45)]'
+          : 'rounded-b-2xl shadow-[0_-6px_18px_-14px_rgba(0,0,0,0.35)]'
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-muted-foreground">Items</span>
         <span className="font-medium tabular-nums">{items.length} lines</span>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">Subtotal</span>
         <span className="text-xl font-semibold tabular-nums">{peso(subtotal)}</span>
       </div>
-      <div className="grid grid-cols-[1fr_auto] gap-2">
-        <Button size="lg" onClick={onCheckout} disabled={items.length === 0}>
-          <CreditCard className="size-4" />
-          Charge {peso(subtotal)}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <Button size="lg" className="min-w-0" onClick={onCheckout} disabled={items.length === 0}>
+          <CreditCard className="size-4 shrink-0" />
+          <span className="truncate">Charge {peso(subtotal)}</span>
         </Button>
         <Button
           variant="outline"
           size="lg"
+          className="shrink-0"
           onClick={clear}
           disabled={items.length === 0}
           aria-label="Clear cart"
@@ -323,8 +342,8 @@ export function CatalogPage() {
             {posDef.name} · tap products to build the cart
           </p>
         </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="relative w-full sm:max-w-xs">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               value={query}
@@ -343,7 +362,7 @@ export function CatalogPage() {
               aria-label="Scan a barcode with the camera"
             >
               <ScanLine className="size-4" />
-              Scan
+              <span className="hidden sm:inline">Scan</span>
             </Button>
           )}
           {scannerOn && scanner.mode === 'usb' && (
@@ -472,7 +491,7 @@ export function CatalogPage() {
                       disabled={out || locked}
                       onClick={() => add(p)}
                       className={cn(
-                        'group overflow-hidden rounded-xl border bg-card text-left transition-all',
+                        'group min-w-0 overflow-hidden rounded-xl border bg-card text-left transition-all',
                         out || locked
                           ? 'cursor-not-allowed opacity-60'
                           : 'hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md'
@@ -530,20 +549,18 @@ export function CatalogPage() {
           </div>
         </div>
 
-        <Card className="hidden w-80 shrink-0 flex-col gap-0 self-stretch shadow-none lg:flex">
-          <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
+        <Card className="hidden w-80 shrink-0 flex-col gap-0 self-stretch overflow-hidden border bg-card py-0 shadow-sm lg:flex">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-card px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
               <ShoppingCart className="size-4" aria-hidden />
               Current sale
             </h2>
             <Badge variant="secondary">{count}</Badge>
           </div>
-          <ScrollArea className="min-h-0 flex-1 px-2">
+          <ScrollArea className="min-h-0 flex-1 px-2 py-2">
             <CartLines />
           </ScrollArea>
-          <div className="shrink-0">
-            <CartSummary onCheckout={() => setCheckoutOpen(true)} />
-          </div>
+          <CartSummary variant="card" onCheckout={() => setCheckoutOpen(true)} />
         </Card>
       </div>
 
@@ -573,6 +590,7 @@ export function CatalogPage() {
               <CartLines />
             </ScrollArea>
             <CartSummary
+              variant="sheet"
               onCheckout={() => {
                 setCartOpen(false)
                 setCheckoutOpen(true)
@@ -620,15 +638,20 @@ function RecentOrders({
   }, [storeId])
 
   return (
-    <section className="mt-6" aria-label="Recent orders">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="mt-6 min-w-0" aria-label="Recent orders">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Recent orders</h2>
-        <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 whitespace-nowrap"
+          onClick={() => setOpen((v) => !v)}
+        >
           {open ? 'Hide' : 'Show last 8'}
         </Button>
       </div>
       {open && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
           {orders.length === 0 ? (
             <p className="text-sm text-muted-foreground">No orders yet.</p>
           ) : (
@@ -637,17 +660,17 @@ function RecentOrders({
                 key={o.id}
                 type="button"
                 onClick={() => onOpenReceipt(o)}
-                className="flex items-center justify-between rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
               >
-                <span>
-                  <span className="block text-sm font-medium" style={{ color: accent }}>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium" style={{ color: accent }}>
                     {o.receiptNo}
                   </span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block truncate text-xs text-muted-foreground">
                     {formatDateTime(o.createdAt)} · {o.items.length} item(s)
                   </span>
                 </span>
-                <span className="text-right">
+                <span className="shrink-0 text-right">
                   <span className="block text-sm font-semibold tabular-nums">{peso(o.total)}</span>
                   <Badge
                     variant={o.paymentStatus === 'paid' ? 'outline' : 'destructive'}

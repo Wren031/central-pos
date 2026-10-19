@@ -46,6 +46,7 @@ import { formatDate, formatDateTime, peso } from '@/lib/format'
 import { planDisplayName } from '@/lib/plan-display'
 import { changePassword, deleteAccount, updateProfile } from '@/lib/repos'
 import { avatarImage } from '@/lib/mock-image'
+import { personInitials } from '@/lib/initials'
 import { useAuth } from '@/state/auth-context'
 import { useSubscription } from '@/state/subscription-context'
 
@@ -161,12 +162,7 @@ export function ProfilePage() {
             className="text-lg font-semibold"
             style={{ backgroundImage: `url(${avatarImage(user.fullName)})`, backgroundSize: 'cover' }}
           >
-            {user.fullName
-              .split(' ')
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase()}
+            {personInitials(user.fullName)}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">

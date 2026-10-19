@@ -104,17 +104,14 @@ export function fileToProductImage(file: File, maxSize = 480): Promise<string> {
   })
 }
 
+import { personInitials } from './initials'
+
 export function logoImage(label: string, colorHue = 25): string {
-  const initials = label
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
+  const initials = personInitials(label)
   const hue = Number.isFinite(colorHue) ? colorHue : hashHue(label)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
   <rect width="96" height="96" rx="22" fill="hsl(${hue} 62% 42%)"/>
-  <text x="48" y="60" font-size="36" font-weight="700" text-anchor="middle" font-family="system-ui, sans-serif" fill="#fff">${initials || 'PS'}</text>
+  <text x="48" y="60" font-size="36" font-weight="700" text-anchor="middle" font-family="system-ui, sans-serif" fill="#fff">${initials}</text>
 </svg>`
   return svgToDataUri(svg)
 }

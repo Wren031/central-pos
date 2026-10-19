@@ -36,6 +36,7 @@ import { Brand } from '@/components/common/brand'
 import { ExpiredBanner } from '@/components/common/expired-banner'
 import { SyncStatusPill } from '@/components/common/sync-status'
 import { getPosType } from '@/lib/pos-types'
+import { personInitials } from '@/lib/initials'
 import { formatDate, relativeFromNow } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/state/auth-context'
@@ -257,33 +258,39 @@ function NotificationBell() {
   )
 }
 
-function UserMenu({ withLabel = false }: { withLabel?: boolean }) {
+function UserMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'header' }) {
   const { user, store, logout } = useAuth()
   const { state } = useSubscription()
   const navigate = useNavigate()
   if (!user) return null
-  const initials = user.fullName
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  const initials = personInitials(user.fullName)
+  const inHeader = variant === 'header'
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-sidebar-accent',
-            withLabel && 'border'
+            'flex min-w-0 items-center rounded-lg text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+            inHeader
+              ? 'h-9 max-w-[15rem] gap-2 px-1.5 hover:bg-muted/70 sm:pr-2.5'
+              : 'w-full gap-2.5 p-2 hover:bg-sidebar-accent'
           )}
-          aria-label="Account menu"
+          aria-label={`Account menu for ${user.fullName}`}
         >
-          <Avatar className="size-8">
+          <Avatar className="size-8 shrink-0">
             <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
           </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{user.fullName}</p>
-            <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+          <div
+            className={cn(
+              'min-w-0 flex-1 text-left',
+              // Keep the header compact on small screens; reveal name/email on wide ones.
+              inHeader && 'hidden xl:block'
+            )}
+          >
+            <p className="truncate text-sm font-medium leading-tight">{user.fullName}</p>
+            <p className="truncate text-[11px] leading-tight text-muted-foreground">
+              {user.email}
+            </p>
           </div>
         </button>
       </DropdownMenuTrigger>
@@ -423,9 +430,9 @@ export function AppShell() {
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <div className="app-shell-col flex h-svh min-w-0 flex-1 flex-col lg:pl-64">
-          <header className="app-header sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
+          <header className="app-header sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:gap-3 sm:px-4">
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label="Open navigation">
+              <Button variant="ghost" size="icon-sm" className="shrink-0 lg:hidden" aria-label="Open navigation">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
@@ -440,25 +447,29 @@ export function AppShell() {
                 <p className="truncate text-sm font-semibold leading-tight">
                   {store?.onboarded ? store.name : 'UniPOS'}
                 </p>
-                <p className="truncate text-[11px] text-muted-foreground">
+                <p className="truncate text-[11px] leading-tight text-muted-foreground">
                   {store?.onboarded ? posDef?.name : 'Complete onboarding'}
                 </p>
               </div>
             </div>
-            <StatusBadge status={state.status} className="hidden sm:inline-flex" />
-            {accountStatus === 'unverified' && (
-              <span
-                className="hidden items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 sm:inline-flex"
-                title="Your account status could not be verified yet. Showing cached access until it can be confirmed."
-              >
-                <AlertTriangle className="size-3" aria-hidden />
-                Unverified
-              </span>
-            )}
-            <SyncStatusPill />
-            <NotificationBell />
-            <div className="hidden lg:block">
-              <UserMenu />
+            {/* Header actions: badges, sync, notifications, and the compact account menu. */}
+            <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
+              <StatusBadge
+                status={state.status}
+                className="hidden shrink-0 sm:inline-flex"
+              />
+              {accountStatus === 'unverified' && (
+                <span
+                  className="hidden shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 lg:inline-flex"
+                  title="Your account status could not be verified yet. Showing cached access until it can be confirmed."
+                >
+                  <AlertTriangle className="size-3" aria-hidden />
+                  Unverified
+                </span>
+              )}
+              <SyncStatusPill />
+              <NotificationBell />
+              <UserMenu variant="header" />
             </div>
           </header>
           <ExpiredBanner />
@@ -488,7 +499,7 @@ export function AppShell() {
             />
           </div>
           <div className="absolute inset-x-3 bottom-4">
-            <UserMenu withLabel />
+            <UserMenu />
           </div>
         </SheetContent>
       </Sheet>
