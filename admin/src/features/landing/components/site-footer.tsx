@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Download, FileText, Mail, Store } from 'lucide-react'
+import { Download, FileText, Mail } from 'lucide-react'
+import { BrandLogo } from './brand-logo'
 import { Container } from './primitives'
 import { COPYRIGHT_YEAR, LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
 
@@ -15,13 +16,8 @@ export function SiteFooter({ onOpenLegal }: { onOpenLegal: (doc: 'privacy' | 'te
       <Container className="py-12">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2.5">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <Store className="size-[18px]" aria-hidden />
-              </span>
-              <span className="text-base font-semibold tracking-tight text-foreground">
-                {SITE.name}
-              </span>
+            <div className="flex items-center">
+              <BrandLogo className="h-9" />
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-pretty text-muted-foreground">
               {SITE.tagline}. Built for businesses that need to keep selling — internet or not.

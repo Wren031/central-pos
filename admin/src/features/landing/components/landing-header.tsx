@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
-import { ArrowRight, Menu, Store, X } from 'lucide-react'
+import { ArrowRight, Menu, X } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from './brand-logo'
 import { Container } from './primitives'
 import { LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
 
@@ -42,13 +43,11 @@ export function LandingHeader() {
       <Container className="flex h-16 items-center justify-between gap-4">
         <a
           href="#top"
-          className="flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="flex items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           aria-label={`${SITE.name} home`}
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Store className="size-[18px]" aria-hidden />
-          </span>
-          <span className="text-base font-semibold tracking-tight text-foreground">{SITE.name}</span>
+          {/* The logo already contains the wordmark; the link carries the name. */}
+          <BrandLogo alt="" className="h-8 sm:h-9" />
         </a>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
