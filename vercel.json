@@ -3,26 +3,37 @@
   "services": {
     "admin": {
       "root": "admin",
-      "framework": "vite"
+      "framework": "vite",
+      "routes": [
+        { "handle": "filesystem" },
+        { "src": "/admin/assets/(.*)", "status": 404 },
+        { "src": "/admin", "dest": "/admin/index.html" },
+        { "src": "/admin/", "dest": "/admin/index.html" },
+        { "src": "/admin/(.*)", "dest": "/admin/index.html" }
+      ]
     },
     "client": {
       "root": "client",
-      "framework": "vite"
+      "framework": "vite",
+      "routes": [
+        { "handle": "filesystem" },
+        { "src": "/assets/(.*)", "status": 404 },
+        { "src": "/", "dest": "/index.html" },
+        { "src": "/(.*)", "dest": "/index.html" }
+      ]
     }
   },
   "rewrites": [
     {
       "source": "/admin",
       "destination": {
-        "service": "admin",
-        "path": "/"
+        "service": "admin"
       }
     },
     {
       "source": "/admin/:path*",
       "destination": {
-        "service": "admin",
-        "path": "/:path*"
+        "service": "admin"
       }
     },
     {
