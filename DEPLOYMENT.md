@@ -1,54 +1,63 @@
-# Vercel deployment
+# Vercel deployment — admin only
 
-This repository is deployed as **one Vercel project with two Vite services**,
-defined in [`vercel.json`](./vercel.json):
+This repository is deployed as a **single Vercel project serving only the
+admin dashboard** (`admin/`), at the domain root (`/`).
 
-| Service  | Public path | Source  | Output         |
-| -------- | ----------- | ------- | -------------- |
-| `client` | `/`         | `client`| `client/dist`  |
-| `admin`  | `/admin`    | `admin` | `admin/dist`   |
+The **customer POS (`client/`)** is not part of this deployment and is never
+built here. Set the Vercel **Root Directory to `admin`** (Project → Settings →
+Build and Deployment Settings) so Vercel ignores `client/` entirely.
 
 ## Required project settings
 
-These live in the Vercel dashboard (Project → Settings), not in this repo:
+These live in the Vercel dashboard, not in this repo:
 
-- **Root Directory: the repository root** (leave it empty / `./`).
-  It must **not** be `admin`. If it is, Vercel ignores the root `vercel.json`,
-  builds only the admin app at `/`, and `/admin/*` returns 404.
-- **Framework Preset:** "Other" (the root has no framework; each service's
-  framework is set in `vercel.json`).
-- **Build Command / Output Directory:** leave empty. Each service uses the
-  Vite preset (`npm run build` → `dist`).
-- **Environment variables** (shared by both services):
+- **Root Directory: `admin`** — Vercel builds only `admin/` and never touches
+  `client/`. Do not change this unless you intend to add the client as a
+  service.
+- **Framework Preset:** "Other" — Vite is detected automatically per service.
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- **Install Command:** leave empty (`npm install`).
+- **Environment variables:**
   - `VITE_SUPABASE_URL`
   - `VITE_SUPABASE_ANON_KEY`
-  - `VITE_POS_APP_URL` — optional. Leave unset when the client is on the same
-    origin (admin links then resolve to `/register` and `/login`).
+  - `VITE_POS_APP_URL` — optional. Set this to the POS client's origin once it
+    is deployed (for example `https://app.unipos.ph`). Until then it is unset,
+    so the admin landing page's "Get Started"/"Sign in" links resolve to
+    `/register` and `/login` on this domain and will 404.
 
-## How the admin is served under `/admin`
+## Routing
 
-Vercel serves a service's static files by the **original request path**. A
-request for `/admin/assets/index-abc.js` is looked up as
-`admin/dist/admin/assets/index-abc.js`, so the admin build emits its files under
-`dist/admin` (`base: '/admin/'` in `admin/vite.config.ts`).
+`admin/vercel.json` defines the entire route table for this deployment:
 
-`admin/vercel.json` does not exist on purpose; the routing is:
+1. `handle: filesystem` — real static assets (`/assets/*`, `/favicon.svg`) are
+   served first.
+2. Anything else with a file extension (`/.*\.[a-zA-Z0-9]+$`) → explicit `404`
+   so missing assets never fall back to HTML.
+3. Everything else → `/index.html` — React Router (with `basename="/"`) handles
+   deep links (`/login`, `/logs`, `/landing`, `/users`, `/settings`, …).
 
-1. Top-level rewrites send `/admin` and `/admin/*` to the `admin` service.
-2. Inside the service, `routes` run in this order:
-   - `handle: filesystem` — real assets are served first.
-   - `/admin/assets/*` → explicit `404` (missing assets never fall back to HTML).
-   - `/admin`, `/admin/`, `/admin/*` → `/admin/index.html` (SPA deep links,
-     handled by React Router with `basename="/admin"`).
-3. Everything else goes to the `client` service, whose `routes` follow the same
-   filesystem → asset-404 → SPA-fallback order.
+## URLs
+
+| Page | URL |
+|---|---|
+| Admin landing / marketing | `/` |
+| Admin login | `/login` |
+| Admin dashboard + console | `/`, `/users`, `/logs`, `/settings`, … |
+| POS client (not deployed yet) | `/register`, `/login` — set `VITE_POS_APP_URL` to deploy |
 
 ## Local checks
 
 ```bash
-npm --prefix admin run build    # writes admin/dist/admin/**
-npm --prefix client run build   # writes client/dist/**
+cd admin
+npm install
+npm run build   # writes admin/dist/{index.html,assets/*}
+npm run preview # http://localhost:5174/
 ```
 
-The admin build cleans `admin/dist` first so stale top-level assets are never
-deployed.
+## If you add the client back later
+
+Create a root `vercel.json` with two services (`admin` at `/admin`, `client` at
+`/`), set the Vercel Root Directory back to the repository root, set Framework
+Preset to "Services", and redeploy. The `client/` build uses `npm ci
+--ignore-scripts` so its `cloudflared` postinstall does not run during builds.
