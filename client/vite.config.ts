@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => {
               workbox: {
                 globPatterns: ['**/*.{js,css,html,svg,woff2}'],
                 navigateFallback: 'index.html',
+                // The POS app is served from the site root, so its service worker
+                // would otherwise answer navigation requests for the admin app
+                // mounted at /admin with this app's index.html.
+                navigateFallbackDenylist: [/^\/admin(?:\/|$)/],
                 runtimeCaching: [
                   {
                     // Google Fonts stylesheets — cache-first so the POS shell renders offline.

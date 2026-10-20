@@ -18,10 +18,13 @@ import { DownloadsPage } from '@/features/downloads/downloads-page'
 import { LogsPage } from '@/features/logs/logs-page'
 import { SettingsPage } from '@/features/settings/settings-page'
 
+/** Mirrors Vite's `base` so routes stay under /admin in production and / in dev. */
+const BASENAME = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/'
+
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={BASENAME}>
         <Routes>
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />

@@ -21,7 +21,11 @@ export const COPYRIGHT_YEAR = new Date().getFullYear()
 
 /** Base URL of the POS client app (registration + merchant login live there). */
 export const POS_APP_URL = (
-  (import.meta.env.VITE_POS_APP_URL as string | undefined) ?? 'http://localhost:5173'
+  (import.meta.env.VITE_POS_APP_URL as string | undefined) ??
+  // In production the client is served from the site root by the same Vercel
+  // project, so relative links are correct for every deployment URL. In dev
+  // the two Vite servers run on different ports.
+  (import.meta.env.DEV ? 'http://localhost:5173' : '')
 ).replace(/\/+$/, '')
 
 export const REGISTER_URL = `${POS_APP_URL}/register`

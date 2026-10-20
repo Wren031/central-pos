@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Served under /admin by the Vercel services rewrite in ../vercel.json, so
+  // built asset URLs must carry the same prefix.
+  base: '/admin/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

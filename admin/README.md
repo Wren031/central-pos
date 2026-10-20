@@ -100,7 +100,9 @@ Fill `.env.local` (Supabase → Settings → API):
 ```
 VITE_SUPABASE_URL=https://your-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_...   # or the legacy anon key
-VITE_POS_APP_URL=http://localhost:5173      # POS client app base URL
+# Optional: POS client base URL. Leave unset in production when the client is
+# served from the site root of the same Vercel project.
+# VITE_POS_APP_URL=https://app.example.com
 ```
 
 > **Security:** only the publishable/anon key belongs in the frontend. Every
@@ -112,7 +114,7 @@ VITE_POS_APP_URL=http://localhost:5173      # POS client app base URL
 
 ```bash
 npm install
-npm run dev        # http://localhost:5174
+npm run dev        # http://localhost:5174/admin/
 ```
 
 Other scripts: `npm run build` (typecheck + production build),
@@ -202,5 +204,5 @@ policies — a POS device can never grant itself a subscription.
 
 | App | URL |
 |---|---|
-| Admin dashboard (this app) | http://localhost:5174 |
+| Admin dashboard (this app) | http://localhost:5174/admin/ |
 | Customer POS (`../client`) | http://localhost:5173 |
