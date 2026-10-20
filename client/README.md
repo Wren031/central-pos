@@ -80,3 +80,35 @@ always show an `ERR_CERT_AUTHORITY_INVALID` warning for it.
 A deployed **web** build must be served over HTTPS (TLS at the host or reverse
 proxy) for the camera to work — there is no client-side workaround for an
 insecure origin. The Android build already uses a secure WebView origin.
+
+## Desktop app (Electron)
+
+The `electron/` folder contains a thin desktop shell around the same POS build.
+`electron/main.cjs` loads the Vite dev server during development and serves the
+built `dist/` over a privileged `app://central-pos` origin in production. The
+custom scheme keeps `BrowserRouter`, IndexedDB/Dexie, the camera and Web
+Bluetooth working exactly as they do on a normal secure site.
+
+```bash
+npm run electron:dev        # Vite + Electron with HMR
+npm run electron:start      # build the desktop bundle, then run it locally
+npm run electron:build      # Windows NSIS installer -> release/UniPOS-Setup-<version>.exe
+npm run electron:build:dir  # unpacked app for inspection (no installer)
+```
+
+Notes:
+
+- The production desktop build skips the PWA service worker (`vite build --mode
+  electron`); the normal `npm run build` still generates it for web deployments.
+- Desktop data lives in Electron's `userData` folder (`%APPDATA%\UniPOS` on
+  Windows), separate from any browser's storage. Use the existing backup/restore
+  feature to move data between the web app and the desktop app.
+- Barcode cameras and USB scanners work as on the web. Bluetooth printing uses
+  Web Bluetooth and therefore works on Windows; Chromium on Linux does not
+  expose Web Bluetooth, and the app reports that honestly.
+- Supabase confirmation emails still follow the project's Site URL / redirect
+  settings. After confirming in the browser, sign in normally in the desktop app.
+- The installer is not code-signed, so Windows SmartScreen will warn. Build it
+  on Windows for the custom icon/version metadata (`electron-builder` needs Wine
+  to finish an NSIS installer when cross-building from Linux).
+

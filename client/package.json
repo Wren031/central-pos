@@ -1,11 +1,20 @@
 {
   "name": "central-pos",
+  "productName": "UniPOS",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
+  "description": "Offline-first point of sale for Philippine businesses",
+  "author": "Central POS",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:electron": "tsc -b && vite build --mode electron",
+    "electron:dev": "concurrently -k -n vite,electron -c blue,green \"npm:dev\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "electron:start": "npm run build:electron && electron .",
+    "electron:build:dir": "npm run build:electron && electron-builder --dir",
+    "electron:build": "npm run build:electron && electron-builder --win nsis",
     "lint": "oxlint",
     "preview": "vite preview",
     "tunnel": "cloudflared tunnel --url http://localhost:5173",
@@ -63,12 +72,49 @@
     "@vitejs/plugin-react": "^6.1.1",
     "cloudflared": "^0.7.3",
     "concurrently": "^10.0.6",
-    "electron": "^44.7.0",
+    "electron": "^44.9.1",
     "electron-builder": "^26.15.3",
     "oxlint": "^1.81.0",
     "playwright": "^1.64.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "com.centralpos.app",
+    "productName": "UniPOS",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "UniPOS",
+      "artifactName": "UniPOS-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
