@@ -1,5 +1,7 @@
 # Logs
-logs
+# Anchored to the repo-app root so it does NOT swallow source directories
+# such as src/features/logs (the activity-logs page).
+/logs
 *.log
 npm-debug.log*
 yarn-debug.log*
