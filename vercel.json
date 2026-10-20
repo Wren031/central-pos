@@ -6,7 +6,7 @@
       "framework": "vite",
       "routes": [
         { "handle": "filesystem" },
-        { "src": "/admin/assets/(.*)", "status": 404 },
+        { "src": "/admin/.*\\.[a-zA-Z0-9]+$", "status": 404 },
         { "src": "/admin", "dest": "/admin/index.html" },
         { "src": "/admin/", "dest": "/admin/index.html" },
         { "src": "/admin/(.*)", "dest": "/admin/index.html" }
@@ -15,9 +15,10 @@
     "client": {
       "root": "client",
       "framework": "vite",
+      "installCommand": "npm ci --ignore-scripts",
       "routes": [
         { "handle": "filesystem" },
-        { "src": "/assets/(.*)", "status": 404 },
+        { "src": "/.*\\.[a-zA-Z0-9]+$", "status": 404 },
         { "src": "/", "dest": "/index.html" },
         { "src": "/(.*)", "dest": "/index.html" }
       ]
@@ -31,7 +32,7 @@
       }
     },
     {
-      "source": "/admin/:path*",
+      "source": "/admin/(.*)",
       "destination": {
         "service": "admin"
       }
