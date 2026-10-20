@@ -26,7 +26,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter basename={BASENAME}>
         <Routes>
-          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<AdminShell />}>
