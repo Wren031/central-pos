@@ -399,7 +399,7 @@ function PlansTab() {
                       {peso(Number(p.price))}
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium leading-none text-zinc-600">
+                      <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium leading-none text-muted-foreground">
                         {p.is_trial ? 'trial' : 'paid'}
                       </span>
                     </TableCell>
@@ -408,8 +408,8 @@ function PlansTab() {
                         className={cn(
                           'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
                           p.active
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-zinc-200 bg-zinc-100 text-zinc-600'
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-white/10 bg-white/5 text-muted-foreground'
                         )}
                       >
                         {p.active ? 'active' : 'inactive'}
@@ -933,7 +933,7 @@ function PaymentsTab() {
               Clear
             </Button>
           </div>
-          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-700">
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-300">
             <UploadCloud className="mr-1 inline size-3.5" />
             Clearing the URL and saving removes the QR from the client (customers see the "not
             configured" notice). No payment gateway is connected anywhere.

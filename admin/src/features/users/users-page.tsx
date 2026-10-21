@@ -247,8 +247,8 @@ export function UsersPage() {
                             size="sm"
                             className={
                               user.status === 'active'
-                                ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800'
+                                ? 'border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200'
+                                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200'
                             }
                             onClick={() => setConfirmTarget(user)}
                           >

@@ -10,31 +10,31 @@ const TONE_STYLES: Record<
     bar: 'bg-primary',
   },
   secondary: {
-    icon: 'bg-sky-500/10 text-sky-600 ring-sky-500/20',
+    icon: 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
     bar: 'bg-sky-500',
   },
   accent: {
-    icon: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20',
+    icon: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
     bar: 'bg-emerald-500',
   },
   info: {
-    icon: 'bg-sky-500/10 text-sky-600 ring-sky-500/20',
+    icon: 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
     bar: 'bg-sky-500',
   },
   success: {
-    icon: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20',
+    icon: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
     bar: 'bg-emerald-500',
   },
   warning: {
-    icon: 'bg-amber-500/10 text-amber-600 ring-amber-500/20',
+    icon: 'bg-amber-500/10 text-amber-400 ring-amber-500/20',
     bar: 'bg-amber-500',
   },
   error: {
-    icon: 'bg-red-500/10 text-red-600 ring-red-500/20',
+    icon: 'bg-red-500/10 text-red-400 ring-red-500/20',
     bar: 'bg-red-500',
   },
   neutral: {
-    icon: 'bg-zinc-500/10 text-zinc-600 ring-zinc-500/20',
+    icon: 'bg-zinc-500/10 text-muted-foreground ring-zinc-500/20',
     bar: 'bg-zinc-500',
   },
 }

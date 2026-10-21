@@ -261,7 +261,7 @@ export function SubscriptionsPage() {
                                 days < 0
                                   ? 'text-destructive'
                                   : days <= 3
-                                    ? 'text-amber-600'
+                                    ? 'text-amber-400'
                                     : 'text-muted-foreground'
                               }`}
                             >
@@ -605,7 +605,7 @@ function RecordPaymentForUserModal({
   return (
     <Modal open={target !== null} onClose={onClose} title="Record mock payment">
       <div className="space-y-4">
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-700">
+        <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-300">
           Mock payments are simulated — no real gateway is contacted. The subscription is activated
           or extended immediately.
         </div>

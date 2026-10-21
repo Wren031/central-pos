@@ -171,7 +171,7 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-9 gap-2 px-2">
           <Avatar className="size-7">
-            <AvatarFallback className="bg-indigo-600 text-[11px] font-semibold text-white">
+            <AvatarFallback className="bg-primary text-[11px] font-semibold text-primary-foreground">
               {initials(profile?.full_name, 'A')}
             </AvatarFallback>
           </Avatar>
@@ -248,7 +248,7 @@ export function AdminShell() {
             </div>
             <Badge
               variant="outline"
-              className="hidden border-indigo-200 bg-indigo-50 text-indigo-600 sm:inline-flex"
+              className="hidden border-indigo-500/30 bg-indigo-500/10 text-indigo-400 sm:inline-flex"
             >
               Admin
             </Badge>

@@ -99,7 +99,7 @@ export function PaymentRequestsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-300">
         Manual GCash QR payments. Customers submit a reference number and receipt screenshot; nothing
         is activated until you approve. Submitting a screenshot is <strong>not</strong> proof of
         payment on its own — verify it against your GCash account first.
@@ -183,7 +183,7 @@ export function PaymentRequestsPanel() {
                         {pr.user?.email ?? pr.submitter_email ?? pr.client_user_id ?? 'Offline device'}
                       </p>
                       {pr.user_id === null && (
-                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                           <Link2 className="size-2.5" /> unlinked
                         </span>
                       )}
@@ -222,7 +222,7 @@ export function PaymentRequestsPanel() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-emerald-600"
+                              className="text-emerald-400"
                               disabled={pr.user_id === null}
                               title={
                                 pr.user_id === null

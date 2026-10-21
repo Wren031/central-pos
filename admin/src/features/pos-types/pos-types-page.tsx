@@ -200,18 +200,18 @@ export function PosTypesPage() {
                     <span
                       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none ${
                         t.active
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-zinc-200 bg-zinc-100 text-zinc-600'
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                          : 'border-white/10 bg-white/5 text-muted-foreground'
                       }`}
                     >
                       {t.active ? 'active' : 'inactive'}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium leading-none text-sky-700">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium leading-none text-sky-300">
                       <Tags className="size-3" aria-hidden />
                       {categoryCounts[t.id] ?? 0} categor{categoryCounts[t.id] === 1 ? 'y' : 'ies'}
                     </span>
                     {t.barcode_enabled && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium leading-none text-violet-700">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium leading-none text-violet-300">
                         <ScanBarcode className="size-3" aria-hidden />
                         Barcode
                       </span>

@@ -170,7 +170,7 @@ function TransactionsPanel() {
         }
       />
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-300">
         All payments here are simulated (mock). No payment gateway is connected — recording a
         succeeded payment activates or extends the subscription immediately.
       </div>
@@ -279,7 +279,7 @@ function TransactionsPanel() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-emerald-600"
+                            className="text-emerald-400"
                             onClick={() => setStatusTarget({ payment: p, next: 'succeeded' })}
                             title="Mark succeeded"
                           >
@@ -291,7 +291,7 @@ function TransactionsPanel() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-amber-600"
+                              className="text-amber-400"
                               onClick={() => setStatusTarget({ payment: p, next: 'refunded' })}
                               title="Mark refunded"
                             >

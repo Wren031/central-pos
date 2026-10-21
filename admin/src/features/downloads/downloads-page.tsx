@@ -296,8 +296,8 @@ export function DownloadsPage() {
                           variant="outline"
                           className={
                             r.status === 'published'
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : 'border-zinc-200 bg-zinc-100 text-zinc-600'
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                              : 'border-white/10 bg-white/5 text-muted-foreground'
                           }
                         >
                           {r.status}

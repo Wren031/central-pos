@@ -57,22 +57,22 @@ export function planLabel(id: string | null | undefined): string {
 /* ---------- Badges (tailwind tone classes for status pills) ---------- */
 
 export const SUB_STATUS_BADGE: Record<SubscriptionStatus, string> = {
-  trial: 'border-sky-200 bg-sky-50 text-sky-700',
-  active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  expired: 'border-red-200 bg-red-50 text-red-700',
-  cancelled: 'border-zinc-200 bg-zinc-100 text-zinc-600',
+  trial: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+  active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  expired: 'border-red-500/30 bg-red-500/10 text-red-300',
+  cancelled: 'border-white/10 bg-white/5 text-muted-foreground',
 }
 
 export const PROFILE_STATUS_BADGE: Record<ProfileStatus, string> = {
-  active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  suspended: 'border-red-200 bg-red-50 text-red-700',
+  active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  suspended: 'border-red-500/30 bg-red-500/10 text-red-300',
 }
 
 export const PAYMENT_STATUS_BADGE: Record<PaymentStatus, string> = {
-  succeeded: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  pending: 'border-amber-200 bg-amber-50 text-amber-700',
-  failed: 'border-red-200 bg-red-50 text-red-700',
-  refunded: 'border-zinc-200 bg-zinc-100 text-zinc-600',
+  succeeded: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  pending: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  failed: 'border-red-500/30 bg-red-500/10 text-red-300',
+  refunded: 'border-white/10 bg-white/5 text-muted-foreground',
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -84,9 +84,9 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 }
 
 export const PAYMENT_REQUEST_STATUS_BADGE: Record<PaymentRequestStatus, string> = {
-  pending: 'border-amber-200 bg-amber-50 text-amber-700',
-  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  rejected: 'border-red-200 bg-red-50 text-red-700',
+  pending: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  rejected: 'border-red-500/30 bg-red-500/10 text-red-300',
 }
 
 /* ---------- Activity log vocabulary ---------- */

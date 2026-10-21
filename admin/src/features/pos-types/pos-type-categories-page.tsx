@@ -335,7 +335,7 @@ export function PosTypeCategoriesPage() {
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                className="size-9 shrink-0 text-emerald-600"
+                                className="size-9 shrink-0 text-emerald-400"
                                 disabled={busy}
                                 onClick={() => void saveRename(cat.id)}
                                 title="Save name"

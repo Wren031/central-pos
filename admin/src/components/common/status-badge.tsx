@@ -18,7 +18,7 @@ const PILL =
 
 export function StatusBadge({ status }: { status: SubscriptionStatus }) {
   return (
-    <span className={cn(PILL, SUB_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600')}>
+    <span className={cn(PILL, SUB_STATUS_BADGE[status] ?? 'border-white/10 bg-white/5 text-muted-foreground')}>
       {status}
     </span>
   )
@@ -26,7 +26,7 @@ export function StatusBadge({ status }: { status: SubscriptionStatus }) {
 
 export function ProfileStatusBadge({ status }: { status: ProfileStatus }) {
   return (
-    <span className={cn(PILL, PROFILE_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600')}>
+    <span className={cn(PILL, PROFILE_STATUS_BADGE[status] ?? 'border-white/10 bg-white/5 text-muted-foreground')}>
       {status}
     </span>
   )
@@ -34,7 +34,7 @@ export function ProfileStatusBadge({ status }: { status: ProfileStatus }) {
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   return (
-    <span className={cn(PILL, PAYMENT_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600')}>
+    <span className={cn(PILL, PAYMENT_STATUS_BADGE[status] ?? 'border-white/10 bg-white/5 text-muted-foreground')}>
       {status}
     </span>
   )
@@ -45,7 +45,7 @@ export function PaymentRequestStatusBadge({ status }: { status: PaymentRequestSt
     <span
       className={cn(
         PILL,
-        PAYMENT_REQUEST_STATUS_BADGE[status] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600'
+        PAYMENT_REQUEST_STATUS_BADGE[status] ?? 'border-white/10 bg-white/5 text-muted-foreground'
       )}
     >
       {status}
@@ -55,7 +55,7 @@ export function PaymentRequestStatusBadge({ status }: { status: PaymentRequestSt
 
 export function PlanBadge({ planId }: { planId: string | null | undefined }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium leading-none text-zinc-700">
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium leading-none text-muted-foreground">
       {planLabel(planId)}
     </span>
   )
@@ -63,7 +63,7 @@ export function PlanBadge({ planId }: { planId: string | null | undefined }) {
 
 export function PosTypeBadge({ name }: { name: string | null | undefined }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-medium leading-none text-zinc-600">
+    <span className="inline-flex items-center rounded-full border border-white/10 px-2 py-0.5 text-[11px] font-medium leading-none text-muted-foreground">
       {name ?? '—'}
     </span>
   )

@@ -31,14 +31,14 @@ import {
 } from '@/components/charts/charts'
 
 const ENTITY_TONE: Record<string, string> = {
-  'user.suspend': 'border-red-200 bg-red-50 text-red-700',
-  'user.activate': 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'user.status_changed': 'border-amber-200 bg-amber-50 text-amber-700',
-  'subscription.extend': 'border-sky-200 bg-sky-50 text-sky-700',
-  'subscription.change_plan': 'border-indigo-200 bg-indigo-50 text-indigo-700',
-  'subscription.cancel': 'border-zinc-200 bg-zinc-100 text-zinc-600',
-  'payment.record': 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'payment.status_changed': 'border-amber-200 bg-amber-50 text-amber-700',
+  'user.suspend': 'border-red-500/30 bg-red-500/10 text-red-300',
+  'user.activate': 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  'user.status_changed': 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  'subscription.extend': 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+  'subscription.change_plan': 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300',
+  'subscription.cancel': 'border-white/10 bg-white/5 text-muted-foreground',
+  'payment.record': 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  'payment.status_changed': 'border-amber-500/30 bg-amber-500/10 text-amber-300',
 }
 
 const QUICK_ACTIONS = [
@@ -275,8 +275,8 @@ export function DashboardPage() {
                   <span
                     className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${
                       item.days_left <= 2
-                        ? 'border-red-200 bg-red-50 text-red-700'
-                        : 'border-amber-200 bg-amber-50 text-amber-700'
+                        ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                        : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                     }`}
                   >
                     {item.days_left}d
@@ -328,7 +328,7 @@ export function DashboardPage() {
               <li key={log.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
                 <span
                   className={`mt-0.5 inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize leading-none ${
-                    ENTITY_TONE[log.action] ?? 'border-zinc-200 bg-zinc-100 text-zinc-600'
+                    ENTITY_TONE[log.action] ?? 'border-white/10 bg-white/5 text-muted-foreground'
                   }`}
                 >
                   {log.action.replace(/^[a-z]+\./, '')}

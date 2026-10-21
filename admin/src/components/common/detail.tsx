@@ -8,11 +8,11 @@ import type { LucideIcon } from 'lucide-react'
 
 const SECTION_TONE: Record<string, string> = {
   primary: 'bg-primary/10 text-primary ring-primary/20',
-  secondary: 'bg-sky-500/10 text-sky-600 ring-sky-500/20',
-  accent: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20',
-  warning: 'bg-amber-500/10 text-amber-600 ring-amber-500/20',
-  error: 'bg-red-500/10 text-red-600 ring-red-500/20',
-  neutral: 'bg-zinc-500/10 text-zinc-600 ring-zinc-500/20',
+  secondary: 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
+  accent: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
+  warning: 'bg-amber-500/10 text-amber-400 ring-amber-500/20',
+  error: 'bg-red-500/10 text-red-400 ring-red-500/20',
+  neutral: 'bg-zinc-500/10 text-muted-foreground ring-zinc-500/20',
 }
 
 export function Breadcrumb({
