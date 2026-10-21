@@ -1,6 +1,6 @@
-import { ArrowRight, Download } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { REGISTER_URL, SITE } from '../site'
+import { SITE } from '../site'
 import { Container } from './primitives'
 import { Reveal } from './reveal'
 
@@ -18,20 +18,14 @@ export function CtaSection() {
               Ready to sell — even without internet?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base text-pretty text-muted-foreground">
-              Create your account, pick your POS type, and start your 30-day free trial. No card
+              Download the app, pick your POS type, and start your 30-day free trial. No card
               required.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg" className="h-11 px-6 text-base">
-                <a href={REGISTER_URL}>
+                <a href="#download">
                   Get Started
                   <ArrowRight aria-hidden />
-                </a>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="h-11 px-6 text-base">
-                <a href="#download">
-                  <Download aria-hidden />
-                  Download POS
                 </a>
               </Button>
             </div>

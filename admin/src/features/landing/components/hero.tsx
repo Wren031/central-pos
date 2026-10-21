@@ -1,8 +1,8 @@
-import { ArrowRight, Check, Download, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Sparkles } from 'lucide-react'
 import heroBackground from '@/assets/unipos.jpeg'
 import { Button } from '@/components/ui/button'
 import { CheckoutDemo } from '../showcase/checkout-demo'
-import { CTA_BENEFITS, REGISTER_URL, SITE } from '../site'
+import { CTA_BENEFITS, SITE } from '../site'
 import { Container } from './primitives'
 import { Reveal } from './reveal'
 
@@ -82,15 +82,9 @@ export function Hero() {
           <Reveal delay={0.18}>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-11 px-6 text-base">
-                <a href={REGISTER_URL}>
+                <a href="#download">
                   Get Started — it’s free
                   <ArrowRight aria-hidden />
-                </a>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="h-11 px-6 text-base">
-                <a href="#download">
-                  <Download aria-hidden />
-                  Download POS
                 </a>
               </Button>
             </div>

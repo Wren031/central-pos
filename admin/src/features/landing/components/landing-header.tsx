@@ -5,7 +5,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { BrandLogo } from '@/components/common/brand-logo'
 import { Container } from './primitives'
-import { LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
+import { NAV_LINKS, SITE } from '../site'
 
 export function LandingHeader() {
   const [scrolled, setScrolled] = React.useState(false)
@@ -67,10 +67,10 @@ export function LandingHeader() {
 
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <a href={LOGIN_URL}>Sign in</a>
+            <a href="/login">Console sign-in</a>
           </Button>
           <Button asChild size="sm">
-            <a href={REGISTER_URL}>
+            <a href="#download">
               Get Started
               <ArrowRight aria-hidden />
             </a>
@@ -112,10 +112,10 @@ export function LandingHeader() {
                 </a>
               ))}
               <a
-                href={LOGIN_URL}
+                href="/login"
                 className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                Sign in
+                Console sign-in
               </a>
             </Container>
           </motion.nav>

@@ -28,10 +28,10 @@ react-router-dom 7 · sonner
   no gateway is connected and nothing activates without admin approval.
 - **Subscription Plans** — a dedicated page for the plan catalogue (duration,
   price, trial flag, features, active state).
-- **Landing page** (`/landing`) — public marketing site: hero, features,
-  supported POS types, subscription plans, how-it-works, installer downloads
-  (published releases only), FAQ, and footer. "Get Started" links to the POS
-  client's registration (`VITE_POS_APP_URL`); the catch-all route serves it.
+- **Landing page** (`/`) — public marketing site: hero, features, supported
+  POS types, subscription plans, how-it-works, installer downloads (published
+  releases only), FAQ, and footer. Every call-to-action opens the downloads
+  section; the only sign-in link goes to the admin console (`/login`).
 - **Downloads** — publish POS installers (Android APK / Windows EXE) with
   version, release notes, and draft/published status. Installers are **not**
   uploaded to Supabase: each release stores a direct external http(s) download
@@ -113,9 +113,6 @@ Fill `.env.local` (Supabase → Settings → API):
 ```
 VITE_SUPABASE_URL=https://your-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_...   # or the legacy anon key
-# Optional: POS client base URL. Leave unset in production when the client is
-# served from the site root of the same Vercel project.
-# VITE_POS_APP_URL=https://app.example.com
 ```
 
 > **Security:** only the publishable/anon key belongs in the frontend. Every

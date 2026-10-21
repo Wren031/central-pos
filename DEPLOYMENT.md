@@ -21,10 +21,9 @@ These live in the Vercel dashboard, not in this repo:
 - **Environment variables:**
   - `VITE_SUPABASE_URL`
   - `VITE_SUPABASE_ANON_KEY`
-  - `VITE_POS_APP_URL` — optional. Set this to the POS client's origin once it
-    is deployed (for example `https://app.unipos.ph`). Until then it is unset,
-    so the admin landing page's "Get Started"/"Sign in" links resolve to
-    `/register` and `/login` on this domain and will 404.
+  - `VITE_POS_APP_URL` is no longer used by the admin: the landing page's
+    call-to-action buttons open the downloads section and the only sign-in
+    link points at the console's own `/login`.
 
 ## Routing
 
@@ -44,7 +43,8 @@ These live in the Vercel dashboard, not in this repo:
 | Admin landing / marketing | `/` |
 | Admin login | `/login` |
 | Admin dashboard + console | `/`, `/users`, `/logs`, `/settings`, … |
-| POS client (not deployed yet) | `/register`, `/login` — set `VITE_POS_APP_URL` to deploy |
+| Admin console sign-in | `/login` |
+| POS installers | `/` → Download section (published releases only) |
 
 ## Local checks
 

@@ -17,9 +17,9 @@ import { SiteFooter } from './components/site-footer'
  *
  * Everything interactive here is presentation only: the checkout
  * demonstration uses fixed sample products and never writes to Supabase or
- * starts a real transaction. Registration and sign-in still hand off to the
- * POS client via `VITE_POS_APP_URL`, and published installers are still the
- * only downloads offered.
+ * starts a real transaction. Call-to-action buttons open the downloads
+ * section, where published installers are offered, and the only sign-in link
+ * points at the admin console.
  */
 export function LandingPage() {
   const [legal, setLegal] = React.useState<'privacy' | 'terms' | null>(null)

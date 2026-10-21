@@ -7,7 +7,7 @@ import { peso } from '@/lib/format'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import type { SubscriptionPlan } from '@/lib/types'
 import { cn } from 'cn'
-import { FALLBACK_PLANS, REGISTER_URL } from '../site'
+import { FALLBACK_PLANS } from '../site'
 import { Container, Section, SectionHeading } from './primitives'
 import { RevealItem } from './reveal'
 
@@ -118,8 +118,8 @@ export function PricingSection() {
                       variant={highlighted ? 'default' : 'outline'}
                       className="w-full"
                     >
-                      <a href={REGISTER_URL}>
-                        {plan.is_trial ? 'Start free trial' : `Choose ${plan.name}`}
+                      <a href="#download">
+                        {plan.is_trial ? 'Download the app' : 'Get the app'}
                       </a>
                     </Button>
                   </div>

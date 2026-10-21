@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Download, FileText, Mail } from 'lucide-react'
 import { BrandLogo } from '@/components/common/brand-logo'
 import { Container } from './primitives'
-import { COPYRIGHT_YEAR, LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
+import { COPYRIGHT_YEAR, NAV_LINKS, SITE } from '../site'
 
 const SUPPORT_LINKS = [
   { href: `mailto:${SITE.contactEmail}`, label: SITE.contactEmail, icon: Mail },
@@ -24,16 +24,16 @@ export function SiteFooter({ onOpenLegal }: { onOpenLegal: (doc: 'privacy' | 'te
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <a
-                href={REGISTER_URL}
+                href="#download"
                 className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
               >
-                Start free trial
+                Download the app
               </a>
               <a
-                href={LOGIN_URL}
+                href="/login"
                 className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
               >
-                Merchant sign in
+                Console sign-in
               </a>
             </div>
           </div>

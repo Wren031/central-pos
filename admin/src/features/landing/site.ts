@@ -19,19 +19,6 @@ export const SITE = {
 
 export const COPYRIGHT_YEAR = new Date().getFullYear()
 
-/** Base URL of the POS client app (registration + merchant login live there). */
-export const POS_APP_URL = (
-  (import.meta.env.VITE_POS_APP_URL as string | undefined) ??
-  // The client is not deployed on this domain yet. In production links
-  // therefore resolve to /register and /login on this origin and 404 until
-  // the client is deployed. Set VITE_POS_APP_URL to the client's origin once
-  // it is deployed. In dev the client runs on a different port.
-  (import.meta.env.DEV ? 'http://localhost:5173' : '')
-).replace(/\/+$/, '')
-
-export const REGISTER_URL = `${POS_APP_URL}/register`
-export const LOGIN_URL = `${POS_APP_URL}/login`
-
 export const NAV_LINKS = [
   { href: '#features', label: 'Features' },
   { href: '#pos-types', label: 'POS Types' },
