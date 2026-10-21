@@ -111,12 +111,7 @@ export function LandingHeader() {
                   {link.label}
                 </a>
               ))}
-              <a
-                href="/login"
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                Console sign-in
-              </a>
+              
             </Container>
           </motion.nav>
         )}

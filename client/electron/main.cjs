@@ -25,8 +25,8 @@ const APP_HOST = 'central-pos'
 const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
 
-/** Only an unpackaged `electron . --dev` opts into the dev server; a plain `electron .` runs dist. */
-const isDev = !app.isPackaged && process.argv.includes('--dev')
+/** Only `electron . --dev` opts into the dev server; a plain `electron .` runs the built dist. */
+const isDev = process.argv.includes('--dev')
 
 const CSP = [
   "default-src 'self'",
@@ -38,7 +38,6 @@ const CSP = [
   "connect-src 'self' https: wss:",
   "worker-src 'self' blob:",
   "frame-src 'none'",
-  "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -115,11 +114,7 @@ protocol.registerSchemesAsPrivileged([
 function notFound() {
   return new Response('Not found', {
     status: 404,
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'no-referrer',
-    },
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   })
 }
 
@@ -178,8 +173,6 @@ async function handleAppRequest(request) {
   const headers = {
     'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
     'Cache-Control': 'no-cache',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
   }
   if (ext === '.html') headers['Content-Security-Policy'] = CSP
 
@@ -202,14 +195,12 @@ function resetBluetoothSelection(cancel = false) {
   const callback = bluetoothCallback
   bluetoothCallback = null
   bluetoothDevices = new Map()
-  if (cancel && callback) safeBluetoothCallback(callback, '')
-}
-
-function safeBluetoothCallback(callback, deviceId) {
-  try {
-    callback(deviceId)
-  } catch {
-    // The renderer or the original request is already gone.
+  if (cancel && callback) {
+    try {
+      callback('')
+    } catch {
+      /* request already gone */
+    }
   }
 }
 
@@ -252,13 +243,13 @@ async function finishBluetoothSelection(win) {
   bluetoothDevices = new Map()
 
   if (devices.length === 0) {
-    safeBluetoothCallback(callback, '')
+    callback('')
     return
   }
 
   // One nearby printer is the normal POS case: skip an unnecessary extra click.
   if (devices.length === 1) {
-    safeBluetoothCallback(callback, devices[0][0])
+    callback(devices[0][0])
     return
   }
 
@@ -268,7 +259,7 @@ async function finishBluetoothSelection(win) {
     type: 'question',
     title: 'Select a Bluetooth printer',
     message: 'Choose the printer to connect to:',
-    detail: 'Nearby Bluetooth LE devices are listed — choose your receipt printer.',
+    detail: 'Only Bluetooth LE (BLE) printers are listed.',
     buttons,
     cancelId: devices.length,
     defaultId: 0,
@@ -280,12 +271,9 @@ async function finishBluetoothSelection(win) {
       ? await dialog.showMessageBox(target, options)
       : await dialog.showMessageBox(options)
     const choice = result.response
-    safeBluetoothCallback(
-      callback,
-      choice >= 0 && choice < devices.length ? devices[choice][0] : ''
-    )
+    callback(choice >= 0 && choice < devices.length ? devices[choice][0] : '')
   } catch {
-    safeBluetoothCallback(callback, '')
+    callback('')
   }
 }
 
@@ -311,7 +299,6 @@ function configureBluetoothPairing(ses) {
             noLink: true,
           })
           .then(() => callback({ confirmed: false }))
-          .catch(() => callback({ confirmed: false }))
         return
       }
 
@@ -332,7 +319,6 @@ function configureBluetoothPairing(ses) {
           noLink: true,
         })
         .then(({ response }) => callback({ confirmed: response === 0 }))
-        .catch(() => callback({ confirmed: false }))
     })
   } catch {
     // Older platforms may not expose a pairing handler; Just Works still works.
@@ -359,7 +345,7 @@ function configurePermissions(ses) {
       return
     }
 
-    if (permission === 'fullscreen' || permission === 'clipboard-sanitized-write' || permission === 'bluetooth') {
+    if (permission === 'fullscreen' || permission === 'clipboard-sanitized-write') {
       callback(true)
       return
     }
@@ -373,11 +359,7 @@ function configurePermissions(ses) {
       const type = details && details.mediaType
       return type !== 'audio'
     }
-    return (
-      permission === 'fullscreen' ||
-      permission === 'clipboard-sanitized-write' ||
-      permission === 'bluetooth'
-    )
+    return permission === 'fullscreen' || permission === 'clipboard-sanitized-write'
   })
 
   configureBluetoothPairing(ses)
@@ -387,7 +369,7 @@ function configurePermissions(ses) {
 function configureDownloads(ses) {
   ses.on('will-download', (_event, item) => {
     const win = BrowserWindow.getFocusedWindow() || mainWindow
-    const suggested = path.basename(item.getFilename() || 'download')
+    const suggested = item.getFilename() || 'download'
     const defaultPath = path.join(app.getPath('downloads'), suggested)
 
     let savePath
@@ -464,7 +446,6 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
     // -3 is an aborted load (e.g. a reload), not a real failure.
     if (!isMainFrame || code === -3) return
-    if (!win.isVisible()) win.show()
     dialog.showErrorBox(
       'UniPOS could not open',
       isDev
@@ -482,10 +463,9 @@ function createWindow() {
         'UniPOS build missing',
         'The production bundle was not found in dist/.\n\nRun "npm run build:electron" before starting Electron.'
       )
-      app.quit()
       return
     }
-    void win.loadURL(`${APP_ORIGIN}/`)
+    void win.loadURL(`${APP_ORIGIN}/index.html`)
   }
 }
 
@@ -521,7 +501,7 @@ if (!gotSingleInstanceLock) {
     configureDownloads(session.defaultSession)
 
     protocol.handle(APP_SCHEME, handleAppRequest)
-    createWindow()
+    createWindow()  
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
