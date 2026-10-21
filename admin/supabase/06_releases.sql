@@ -1,10 +1,10 @@
 -- ============================================================================
 -- Central POS — Admin Dashboard: 06_releases.sql
--- POS installer releases + public storage bucket. Run AFTER 05_...sql.
+-- POS installer releases. Run AFTER 05_...sql.
 --
--- The public landing page (/landing) reads ONLY published releases as the
--- anon role. The admin console (Downloads page) manages rows and uploads
--- installer files into the public-read "pos-releases" storage bucket.
+-- The public landing page reads ONLY published releases as the anon role. The
+-- admin console (Downloads page) manages rows, each pointing at an external
+-- http(s) download URL — installers are not uploaded to Supabase.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -14,16 +14,15 @@ create table if not exists public.pos_releases (
   id              uuid primary key default gen_random_uuid(),
   platform        text not null check (platform in ('android', 'windows')),
   version         text not null check (version ~ '^[0-9]+\.[0-9]+(\.[0-9]+)?([-+][0-9A-Za-z.-]+)?$'),
-  file_path       text,
-  download_url    text,
+  -- Releases are external links only: the installer is hosted elsewhere and
+  -- this URL is required (see 18_external_releases.sql).
+  download_url    text not null check (download_url ~* '^https?://[^[:space:]]+$'),
   file_size_bytes bigint check (file_size_bytes is null or file_size_bytes >= 0),
   release_notes   text,
   status          text not null default 'draft' check (status in ('draft', 'published')),
   created_by      uuid references public.profiles (id) on delete set null,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
-  -- a release must point at an uploaded file or an external download URL
-  constraint pos_releases_source_check check (file_path is not null or download_url is not null),
   constraint pos_releases_version_uniq unique (platform, version)
 );
 
@@ -109,36 +108,3 @@ drop trigger if exists audit_pos_releases on public.pos_releases;
 create trigger audit_pos_releases
   after insert or update or delete on public.pos_releases
   for each row execute function public.audit_pos_releases();
-
--- ---------------------------------------------------------------------------
--- Storage bucket "pos-releases" — public READ (installers are public
--- artifacts), admin-only writes. Files land under <platform>/<file>.
--- ---------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('pos-releases', 'pos-releases', true)
-on conflict (id) do update set public = true;
-
-drop policy if exists "pos_releases_objects_public_read" on storage.objects;
-create policy "pos_releases_objects_public_read"
-  on storage.objects for select
-  to public
-  using (bucket_id = 'pos-releases');
-
-drop policy if exists "pos_releases_objects_admin_insert" on storage.objects;
-create policy "pos_releases_objects_admin_insert"
-  on storage.objects for insert
-  to authenticated
-  with check (bucket_id = 'pos-releases' and public.is_admin());
-
-drop policy if exists "pos_releases_objects_admin_update" on storage.objects;
-create policy "pos_releases_objects_admin_update"
-  on storage.objects for update
-  to authenticated
-  using (bucket_id = 'pos-releases' and public.is_admin())
-  with check (bucket_id = 'pos-releases' and public.is_admin());
-
-drop policy if exists "pos_releases_objects_admin_delete" on storage.objects;
-create policy "pos_releases_objects_admin_delete"
-  on storage.objects for delete
-  to authenticated
-  using (bucket_id = 'pos-releases' and public.is_admin());
