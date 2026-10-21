@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Download, FileText, Mail } from 'lucide-react'
-import { BrandLogo } from './brand-logo'
+import { BrandLogo } from '@/components/common/brand-logo'
 import { Container } from './primitives'
 import { COPYRIGHT_YEAR, LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
 
@@ -17,7 +17,7 @@ export function SiteFooter({ onOpenLegal }: { onOpenLegal: (doc: 'privacy' | 'te
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
             <div className="flex items-center">
-              <BrandLogo className="h-9" />
+              <BrandLogo tone="mono" className="h-9" />
             </div>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-pretty text-muted-foreground">
               {SITE.tagline}. Built for businesses that need to keep selling — internet or not.

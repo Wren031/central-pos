@@ -13,6 +13,8 @@
 @layer base {
   html {
     @apply font-sans;
+    color-scheme: dark;
+    background-color: var(--background);
   }
   body {
     @apply antialiased bg-background text-foreground;
@@ -65,50 +67,15 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  --background: oklch(0.985 0.002 264);
-  --foreground: oklch(0.16 0.02 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.02 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.02 264);
-  --primary: oklch(0.511 0.262 277);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.965 0.005 264);
-  --secondary-foreground: oklch(0.22 0.02 264);
-  --muted: oklch(0.965 0.005 264);
-  --muted-foreground: oklch(0.52 0.02 264);
-  --accent: oklch(0.955 0.008 277);
-  --accent-foreground: oklch(0.35 0.08 277);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.925 0.004 264);
-  --input: oklch(0.91 0.005 264);
-  --ring: oklch(0.585 0.233 277);
-  --chart-1: oklch(0.585 0.233 277);
-  --chart-2: oklch(0.685 0.169 237);
-  --chart-3: oklch(0.696 0.17 162);
-  --chart-4: oklch(0.769 0.188 70);
-  --chart-5: oklch(0.645 0.246 16.4);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.19 0.025 266);
-  --sidebar-foreground: oklch(0.93 0.005 264);
-  --sidebar-primary: oklch(0.585 0.233 277);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.28 0.03 266);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.585 0.233 277);
-}
-
 /*
- * Landing page surface.
+ * Global theme.
  *
- * The public marketing page runs a dark, near-black palette that is scoped to
- * this class so the admin console keeps its own light tokens untouched — every
- * `bg-background` / `bg-card` / `border-border` / button inside the landing
- * tree picks these up automatically.
+ * The admin console and the marketing landing page share one dark, near-black
+ * palette with an indigo accent. Every component consumes the semantic tokens
+ * below (bg-background, bg-card, border-border, text-muted-foreground, …), so
+ * this block is the single source of truth for both surfaces.
  */
-.landing-surface {
+:root {
   color-scheme: dark;
 
   --background: oklch(0.145 0.003 264);
@@ -129,52 +96,35 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.66 0.21 277);
+  --chart-1: oklch(0.62 0.19 277);
+  --chart-2: oklch(0.7 0.15 237);
+  --chart-3: oklch(0.7 0.16 162);
+  --chart-4: oklch(0.78 0.16 70);
+  --chart-5: oklch(0.65 0.23 16.4);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.17 0.004 264);
+  --sidebar-foreground: oklch(0.93 0.005 264);
+  --sidebar-primary: oklch(0.66 0.21 277);
+  --sidebar-primary-foreground: oklch(0.11 0.01 277);
+  --sidebar-accent: oklch(0.24 0.01 266);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.66 0.21 277);
 }
 
-/* Keep the document itself dark while the landing page is mounted so overscroll
- * and the native scrollbar match the page instead of flashing white. */
-html:has(.landing-surface),
-body:has(.landing-surface) {
+/*
+ * Landing page marker.
+ *
+ * The global palette above already is the landing page's dark theme, so this
+ * class only keeps the document chrome consistent for the marketing surface.
+ * It is still applied by `LandingPage` and by the portaled legal dialogs.
+ */
+.landing-surface {
   color-scheme: dark;
-  background-color: oklch(0.145 0.003 264);
 }
 
 /* The legal dialogs are portaled to the body, so their scrim needs to match the
  * dark landing theme rather than the neutral default. */
 [data-slot='dialog-overlay']:has(+ [data-slot='dialog-content'].landing-surface) {
   background-color: oklch(0 0 0 / 70%);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.19 277);
-  --primary-foreground: oklch(0.16 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.28 0.03 277);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.19 277);
-  --chart-1: oklch(0.62 0.19 277);
-  --chart-2: oklch(0.7 0.15 237);
-  --chart-3: oklch(0.7 0.16 162);
-  --chart-4: oklch(0.78 0.16 70);
-  --chart-5: oklch(0.65 0.23 16.4);
-  --sidebar: oklch(0.16 0.02 266);
-  --sidebar-foreground: oklch(0.93 0.005 264);
-  --sidebar-primary: oklch(0.62 0.19 277);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.26 0.03 266);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.62 0.19 277);
 }

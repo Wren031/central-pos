@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 
 import { ArrowRight, Menu, X } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
-import { BrandLogo } from './brand-logo'
+import { BrandLogo } from '@/components/common/brand-logo'
 import { Container } from './primitives'
 import { LOGIN_URL, NAV_LINKS, REGISTER_URL, SITE } from '../site'
 
@@ -47,7 +47,7 @@ export function LandingHeader() {
           aria-label={`${SITE.name} home`}
         >
           {/* The logo already contains the wordmark; the link carries the name. */}
-          <BrandLogo alt="" className="h-8 sm:h-9" />
+          <BrandLogo tone="mono" alt="" className="h-8 sm:h-9" />
         </a>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
