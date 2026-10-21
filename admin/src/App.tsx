@@ -16,6 +16,7 @@ import { PosTypesPage } from '@/features/pos-types/pos-types-page'
 import { PosTypeCategoriesPage } from '@/features/pos-types/pos-type-categories-page'
 import { DownloadsPage } from '@/features/downloads/downloads-page'
 import { LogsPage } from '@/features/logs/logs-page'
+import { SubscriptionPlansPage } from '@/features/plans/plans-page'
 import { SettingsPage } from '@/features/settings/settings-page'
 
 /** Mirrors Vite's `base` (`/`), so routes are served from the domain root. */
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/stores" element={<StoresPage />} />
               <Route path="/stores/:storeId" element={<StoreDetailPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
+              <Route path="/plans" element={<SubscriptionPlansPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/pos-types" element={<PosTypesPage />} />
               <Route path="/pos-types/:posTypeId/categories" element={<PosTypeCategoriesPage />} />

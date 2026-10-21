@@ -74,7 +74,6 @@ export function SubscriptionsPage() {
   const [extendTarget, setExtendTarget] = React.useState<SubRow | null>(null)
   const [planTarget, setPlanTarget] = React.useState<SubRow | null>(null)
   const [cancelTarget, setCancelTarget] = React.useState<SubRow | null>(null)
-  const [payTarget, setPayTarget] = React.useState<SubRow | null>(null)
   const [busy, setBusy] = React.useState(false)
 
   // Reset to page 1 whenever search/filters change (adjust-during-render pattern).
@@ -142,7 +141,6 @@ export function SubscriptionsPage() {
       setExtendTarget(null)
       setPlanTarget(null)
       setCancelTarget(null)
-      setPayTarget(null)
       subs.reload()
     } catch (err) {
       toast.error(errorMessage(err))
@@ -294,14 +292,6 @@ export function SubscriptionsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setPayTarget(sub)}
-                            title="Record mock payment"
-                          >
-                            <CreditCard className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
                             className="text-destructive"
                             onClick={() => setCancelTarget(sub)}
                             disabled={sub.status === 'cancelled'}
@@ -347,27 +337,6 @@ export function SubscriptionsPage() {
             'admin_change_plan',
             { target_user: planTarget?.user_id, new_plan: planId, reason },
             `Plan changed to ${planLabel(planId)}.`
-          )
-        }
-      />
-
-      {/* Record payment */}
-      <RecordPaymentForUserModal
-        target={payTarget}
-        plans={plans.data ?? []}
-        busy={busy}
-        onClose={() => setPayTarget(null)}
-        onConfirm={(planId, method, notes) =>
-          void runRpc(
-            'admin_record_mock_payment',
-            {
-              target_user: payTarget?.user_id,
-              target_plan: planId,
-              p_method: method,
-              p_notes: notes,
-              p_activate: true,
-            },
-            'Mock payment recorded and subscription activated.'
           )
         }
       />
@@ -569,98 +538,6 @@ function ChangePlanModal({
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
             Change plan
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-function RecordPaymentForUserModal({
-  target,
-  plans,
-  busy,
-  onClose,
-  onConfirm,
-}: {
-  target: SubRow | null
-  plans: SubscriptionPlan[]
-  busy: boolean
-  onClose: () => void
-  onConfirm: (planId: string, method: string, notes: string) => void
-}) {
-  const [planId, setPlanId] = React.useState('')
-  const [method, setMethod] = React.useState('mock_gcash')
-  const [notes, setNotes] = React.useState('')
-
-  React.useEffect(() => {
-    if (target) {
-      setPlanId(plans.find((p) => !p.is_trial)?.id ?? plans[0]?.id ?? '')
-      setMethod('mock_gcash')
-      setNotes('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target])
-
-  return (
-    <Modal open={target !== null} onClose={onClose} title="Record mock payment">
-      <div className="space-y-4">
-        <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-300">
-          Mock payments are simulated — no real gateway is contacted. The subscription is activated
-          or extended immediately.
-        </div>
-        <p className="text-sm text-muted-foreground">
-          For <strong>{target?.user?.full_name || target?.user?.email}</strong> (currently{' '}
-          {planLabel(target?.plan_id)}).
-        </p>
-        <Field label="Plan">
-          <Select value={planId} onValueChange={setPlanId}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a plan" />
-            </SelectTrigger>
-            <SelectContent>
-              {plans
-                .filter((p) => !p.is_trial)
-                .map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} — {peso(Number(p.price))}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Method">
-          <Select value={method} onValueChange={setMethod}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mock_gcash">GCash (mock)</SelectItem>
-              <SelectItem value="mock_card">Card (mock)</SelectItem>
-              <SelectItem value="mock_bank">Bank transfer (mock)</SelectItem>
-              <SelectItem value="cash">Cash</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Notes (optional)">
-          <Input
-            type="text"
-            placeholder="e.g. walk-in payment recorded by support"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            disabled={busy || !planId}
-            onClick={() => onConfirm(planId, method, notes)}
-          >
-            {busy && <Loader2 className="size-4 animate-spin" />}
-            Record payment
           </Button>
         </div>
       </div>

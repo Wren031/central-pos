@@ -105,7 +105,8 @@ export interface Subscription {
   plan?: Pick<SubscriptionPlan, 'id' | 'name' | 'duration_days' | 'price' | 'is_trial'> | null
 }
 
-export type PaymentMethod = 'mock_card' | 'mock_gcash' | 'mock_bank' | 'cash' | 'gcash_qr'
+/** GCash is the only payment method: manual QR transfers verified by an admin. */
+export type PaymentMethod = 'gcash_qr'
 export type PaymentStatus = 'succeeded' | 'pending' | 'failed' | 'refunded'
 
 export type PaymentRequestStatus = 'pending' | 'approved' | 'rejected'
@@ -145,6 +146,8 @@ export interface Payment {
   user_id: string
   subscription_id: string | null
   plan_id: string | null
+  /** The verified GCash request this ledger row came from (holds the receipt). */
+  payment_request_id: string | null
   reference: string
   method: PaymentMethod
   amount: number
@@ -155,6 +158,10 @@ export interface Payment {
   created_at: string
   user?: Pick<Profile, 'id' | 'full_name' | 'email'> | null
   plan?: Pick<SubscriptionPlan, 'id' | 'name'> | null
+  payment_request?: Pick<
+    PaymentRequest,
+    'id' | 'reference_no' | 'proof_path' | 'proof_url' | 'notes' | 'created_at'
+  > | null
 }
 
 export interface ActivityLog {

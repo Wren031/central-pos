@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   CheckCircle2,
-  ImageOff,
   Link2,
   Loader2,
   RotateCw,
@@ -19,9 +18,9 @@ import {
   fetchPaymentRequests,
   linkPaymentRequest,
   rejectPaymentRequest,
-  resolveProofHref,
 } from '@/lib/payment-requests'
 import type { PaymentRequest, Profile } from '@/lib/types'
+import { hasReceipt, ReceiptButton, ReceiptViewer } from './receipt-viewer'
 import { Card, EmptyState, ErrorState, LoadingRows, TableWrap } from '@/components/common/states'
 import { Modal } from '@/components/common/modal'
 import { ConfirmModal } from '@/components/common/states'
@@ -167,13 +166,13 @@ export function PaymentRequestsPanel() {
                   <TableRow key={pr.id}>
                     <TableCell>
                       <p className="font-mono text-xs font-medium">{pr.reference_no}</p>
-                      <button
-                        type="button"
-                        className="text-[11px] text-primary hover:underline"
-                        onClick={() => setProofTarget(pr)}
-                      >
-                        View proof
-                      </button>
+                      {hasReceipt({ proofPath: pr.proof_path, proofUrl: pr.proof_url }) ? (
+                        <ReceiptButton onClick={() => setProofTarget(pr)} />
+                      ) : (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          No receipt
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <p className="truncate text-sm">
@@ -254,7 +253,23 @@ export function PaymentRequestsPanel() {
         )}
       </Card>
 
-      <ProofViewer target={proofTarget} onClose={() => setProofTarget(null)} />
+      <ReceiptViewer
+        subject={
+          proofTarget
+            ? {
+                reference: proofTarget.reference_no,
+                amount: Number(proofTarget.amount),
+                planId: proofTarget.plan_id,
+                planName: proofTarget.plan?.name ?? null,
+                submittedAt: proofTarget.created_at,
+                notes: proofTarget.notes,
+                proofPath: proofTarget.proof_path,
+                proofUrl: proofTarget.proof_url,
+              }
+            : null
+        }
+        onClose={() => setProofTarget(null)}
+      />
 
       <ConfirmModal
         open={approveTarget !== null}
@@ -293,88 +308,6 @@ export function PaymentRequestsPanel() {
         }}
       />
     </div>
-  )
-}
-
-function ProofViewer({
-  target,
-  onClose,
-}: {
-  target: PaymentRequest | null
-  onClose: () => void
-}) {
-  const [href, setHref] = React.useState<string | null>(null)
-  const [loading, setLoading] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!target) {
-      setHref(null)
-      return
-    }
-    let cancelled = false
-    setLoading(true)
-    setHref(null)
-    void resolveProofHref(target)
-      .then((url) => {
-        if (!cancelled) setHref(url)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [target])
-
-  return (
-    <Modal open={target !== null} onClose={onClose} title="Payment proof" size="lg">
-      {target && (
-        <div className="space-y-3">
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
-            <p>
-              <span className="text-muted-foreground">Reference: </span>
-              <span className="font-mono">{target.reference_no}</span>
-            </p>
-            <p>
-              <span className="text-muted-foreground">Amount: </span>
-              {peso(Number(target.amount))}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Plan: </span>
-              {target.plan?.name ?? planLabel(target.plan_id)}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Submitted: </span>
-              {formatDateTime(target.created_at)}
-            </p>
-          </div>
-          {target.notes && (
-            <p className="rounded-lg bg-muted/60 p-3 text-sm">
-              <span className="text-muted-foreground">Notes: </span>
-              {target.notes}
-            </p>
-          )}
-          <div className="flex min-h-56 items-center justify-center rounded-lg border bg-muted/30 p-3">
-            {loading ? (
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            ) : href ? (
-              <a href={href} target="_blank" rel="noreferrer" className="block">
-                <img
-                  src={href}
-                  alt={`Payment proof for ${target.reference_no}`}
-                  className="max-h-[60vh] w-auto rounded-md object-contain"
-                />
-              </a>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <ImageOff className="size-7" />
-                <p className="text-sm">No receipt image attached to this request.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </Modal>
   )
 }
 

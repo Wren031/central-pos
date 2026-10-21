@@ -12,7 +12,6 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type {
-  PaymentMethod,
   PaymentRequestStatus,
   PaymentStatus,
   ProfileStatus,
@@ -73,14 +72,6 @@ export const PAYMENT_STATUS_BADGE: Record<PaymentStatus, string> = {
   pending: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
   failed: 'border-red-500/30 bg-red-500/10 text-red-300',
   refunded: 'border-white/10 bg-white/5 text-muted-foreground',
-}
-
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  mock_card: 'Mock Card',
-  mock_gcash: 'GCash (mock)',
-  mock_bank: 'Bank (mock)',
-  cash: 'Cash',
-  gcash_qr: 'GCash QR (manual)',
 }
 
 export const PAYMENT_REQUEST_STATUS_BADGE: Record<PaymentRequestStatus, string> = {

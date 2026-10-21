@@ -24,19 +24,10 @@ export async function fetchPaymentRequests(): Promise<PaymentRequest[]> {
 }
 
 /**
- * Resolves a browser-facing URL for a proof image. Prefers an explicit URL;
- * otherwise mints a short-lived signed URL for the private object. Returns
- * null when the row carries no proof (never fabricates a link).
+ * Proof/receipt URLs are resolved by the shared receipt viewer
+ * (`features/payments/receipt-viewer.tsx`) so the verification queue and the
+ * ledger use exactly the same signing logic.
  */
-export async function resolveProofHref(pr: PaymentRequest): Promise<string | null> {
-  if (pr.proof_url) return pr.proof_url
-  if (!pr.proof_path) return null
-  const { data, error } = await supabase.storage
-    .from(PROOF_BUCKET)
-    .createSignedUrl(pr.proof_path, 60 * 60)
-  if (error) return null
-  return data?.signedUrl ?? null
-}
 
 export async function approvePaymentRequest(id: string, reason?: string): Promise<void> {
   const { error } = await supabase.rpc('admin_approve_payment_request', {

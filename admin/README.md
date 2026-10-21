@@ -22,8 +22,12 @@ react-router-dom 7 · sonner
   change plan, cancel, record renewals; expiry countdowns.
 - **POS types** — manage the supported business types (BBQ, retail, grocery,
   restaurant, cafe, pharmacy, general merchandise) and add new ones.
-- **Payments** — mock payment records with references, methods, and statuses
-  (succeeded/pending/failed/refunded). No gateway is connected.
+- **GCash Payments** — verify customer-submitted GCash transfers (reference
+  number + receipt screenshot), open the receipt image, and browse the payment
+  ledger (succeeded/pending/failed/refunded). GCash is the only payment method;
+  no gateway is connected and nothing activates without admin approval.
+- **Subscription Plans** — a dedicated page for the plan catalogue (duration,
+  price, trial flag, features, active state).
 - **Landing page** (`/landing`) — public marketing site: hero, features,
   supported POS types, subscription plans, how-it-works, installer downloads
   (published releases only), FAQ, and footer. "Get Started" links to the POS
@@ -57,7 +61,7 @@ order**:
 3. `supabase/03_functions.sql` — admin RPCs, audit logging, `admin_dashboard_stats()`,
    `verify_subscription()`, `promote_to_admin()`
 4. `supabase/04_seed.sql` — plans, POS types, settings, and realistic demo data
-   (18 customers, 18 stores, subscriptions, mock payments, logs)
+   (18 customers, 18 stores, subscriptions, logs)
 5. `supabase/05_categories_migration.sql` — global `categories` catalog +
    `pos_type_categories` assignments
 6. `supabase/06_releases.sql` — `pos_releases` (installer releases), anon
@@ -69,6 +73,11 @@ order**:
 9. `supabase/10_client_subscription_access.sql` — lets the session-less POS
    client read the active GCash QR, submit manual payment proofs (always
    pending), and check its own submission status
+10. `supabase/11…16_*.sql` — account status, suspend guards, account deletion,
+    barcodes, client store config, workspace uniqueness
+11. `supabase/17_gcash_only.sql` — links `payments` to the verified
+    `payment_requests` row (so each ledger entry can open its receipt), makes
+    GCash the only payment method, and removes the mock payment RPC + demo rows
 
 The scripts are idempotent — safe to re-run after a partial failure.
 
@@ -148,7 +157,7 @@ Demo customer logins (created by the seed): `juan@bbqhouse.ph` /
 |---|---|
 | Authentication | Supabase Auth (email/password), session persisted by supabase-js |
 | Authorization | RLS policies on every table; `is_admin()` security-definer helper checks `profiles.role` |
-| Mutations | Admin actions go through SECURITY DEFINER RPCs (`admin_set_user_status`, `admin_extend_subscription`, `admin_change_plan`, `admin_cancel_subscription`, `admin_record_mock_payment`, `admin_delete_plan`) that re-check admin rights and write audit rows atomically |
+| Mutations | Admin actions go through SECURITY DEFINER RPCs (`admin_set_user_status`, `admin_extend_subscription`, `admin_change_plan`, `admin_cancel_subscription`, `admin_approve_payment_request`, `admin_delete_plan`) that re-check admin rights and write audit rows atomically |
 | Client-facing RPCs | The session-less POS client calls `public_gcash_qr()`, `submit_payment_request()`, and `client_payment_requests()` (anon-executable SECURITY DEFINER). Submission always writes `status='pending'` with `user_id=null`; only an admin approval activates a plan |
 | Audit | DB triggers on `profiles`, `stores`, `subscriptions`, `payments`, `pos_types`, `subscription_plans`, `system_settings` + explicit RPC logging. `activity_logs` is append-only (no update/delete policies) |
 | Role escalation | `profiles_protect` trigger blocks role/email/status changes except by admins; `promote_to_admin()` is the only path to admin |
@@ -161,14 +170,16 @@ Demo customer logins (created by the seed): `juan@bbqhouse.ph` /
 - `subscriptions` — **one current row per user** (mirrors the POS client's
   local Dexie model so future device sync stays trivial). Renewal history
   lives in `payments`.
-- `subscription_plans` — editable in Settings (`trial` 30d ₱0, `weekly` 7d
+- `subscription_plans` — editable on the Subscription Plans page (`trial` 30d ₱0, `weekly` 7d
   ₱99, `monthly` 30d ₱299, `yearly` 365d ₱2,999 by default). Plans can be
   created/edited/activated/deactivated at any time; deleting a plan is blocked
   while any subscription, payment, or request references it
   (`admin_delete_plan` — deactivate instead).
 - `system_settings.gcash_qr` — `{"url","active"}`; the POS client reads only the
   active QR via `public_gcash_qr()`.
-- `payments` — mock only; `reference` is the transaction id.
+- `payments` — the GCash ledger only. Each row is written by
+  `admin_approve_payment_request()`, which also sets `payment_request_id` so the
+  receipt screenshot stays reachable. `reference` is the transaction id.
 - `pos_sales` — forward-compatible table for offline POS sale sync: a device
   queues sales offline and pushes them here on reconnect with a unique
   `idempotency_key` (retries can never double-count). RLS allows a device to

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  BadgeDollarSign,
   ChevronDown,
   CreditCard,
   Database,
@@ -48,7 +49,8 @@ const NAV_SECTIONS: { label: string; items: { to: string; label: string; icon: R
       { to: '/users', label: 'Users', icon: Users },
       { to: '/stores', label: 'Stores', icon: StoreIcon },
       { to: '/subscriptions', label: 'Subscriptions', icon: CreditCard },
-      { to: '/payments', label: 'Payments', icon: Wallet },
+      { to: '/plans', label: 'Subscription Plans', icon: BadgeDollarSign },
+      { to: '/payments', label: 'GCash Payments', icon: Wallet },
     ],
   },
   {
@@ -67,7 +69,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/users': 'Users',
   '/stores': 'Stores',
   '/subscriptions': 'Subscriptions',
-  '/payments': 'Payments',
+  '/plans': 'Subscription Plans',
+  '/payments': 'GCash Payments',
   '/pos-types': 'POS Types',
   '/downloads': 'Downloads',
   '/logs': 'Activity Logs',
