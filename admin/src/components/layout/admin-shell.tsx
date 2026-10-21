@@ -40,7 +40,7 @@ import { useAuth } from '@/state/auth-context'
 const NAV_SECTIONS: { label: string; items: { to: string; label: string; icon: React.ElementType; end?: boolean }[] }[] = [
   {
     label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+    items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true }],
   },
   {
     label: 'Management',
@@ -63,7 +63,7 @@ const NAV_SECTIONS: { label: string; items: { to: string; label: string; icon: R
 ]
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Dashboard',
+  '/dashboard': 'Dashboard',
   '/users': 'Users',
   '/stores': 'Stores',
   '/subscriptions': 'Subscriptions',
