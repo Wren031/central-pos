@@ -102,9 +102,9 @@ export function LoginPage() {
         <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_minmax(0,25rem)] lg:gap-16">
           {/* Brand panel — desktop only; the form stays above the fold on mobile. */}
           <section className="hidden lg:block">
-            <BrandLogo tone="mono" className="h-9" />
+            <BrandLogo tone="mono" className="h-7" />
 
-            <h2 className="mt-8 max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight text-balance">
+            <h2 className="mt-7 max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight text-balance">
               The control room behind every UniPOS store.
             </h2>
             <p className="mt-4 max-w-md text-[15px] leading-relaxed text-pretty text-muted-foreground">
@@ -136,8 +136,8 @@ export function LoginPage() {
 
           {/* Sign-in panel */}
           <section aria-labelledby="login-heading" className="mx-auto w-full max-w-md lg:max-w-none">
-            <div className="mb-7 flex justify-center lg:hidden">
-              <BrandLogo tone="mono" className="h-8" />
+            <div className="mb-6 flex justify-center lg:hidden">
+              <BrandLogo tone="mono" className="h-6" />
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-card/70 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-8">
