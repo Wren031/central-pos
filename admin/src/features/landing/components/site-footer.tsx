@@ -29,12 +29,6 @@ export function SiteFooter({ onOpenLegal }: { onOpenLegal: (doc: 'privacy' | 'te
               >
                 Download the app
               </a>
-              <a
-                href="/login"
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                Console sign-in
-              </a>
             </div>
           </div>
 

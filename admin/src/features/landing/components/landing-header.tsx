@@ -66,9 +66,6 @@ export function LandingHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <a href="/login">Console sign-in</a>
-          </Button>
           <Button asChild size="sm">
             <a href="#download">
               Get Started
