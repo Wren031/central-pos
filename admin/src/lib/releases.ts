@@ -2,8 +2,6 @@ import { supabase } from '@/lib/supabase'
 import { errorMessage } from '@/lib/errors'
 import type { PosRelease, ReleasePlatform } from '@/lib/types'
 
-export const RELEASE_BUCKET = 'pos-releases'
-
 export const PLATFORM_LABELS: Record<ReleasePlatform, string> = {
   android: 'Android',
   windows: 'Windows',
@@ -37,18 +35,12 @@ export function latestPerPlatform(
 }
 
 /**
- * Resolves the browser-facing download URL for a release. Prefers an
- * explicitly configured external URL; falls back to the public URL of the
- * uploaded installer in the pos-releases bucket. Returns null when the row
- * has no usable source (never fabricates a link).
+ * Resolves the browser-facing download URL for a release. Releases are external
+ * links only, so this is the stored URL; it returns null only for legacy rows
+ * created before external URLs became required (never fabricates a link).
  */
 export function releaseDownloadHref(release: PosRelease): string | null {
-  if (release.download_url) return release.download_url
-  if (release.file_path) {
-    return supabase.storage.from(RELEASE_BUCKET).getPublicUrl(release.file_path).data
-      .publicUrl
-  }
-  return null
+  return release.download_url || null
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

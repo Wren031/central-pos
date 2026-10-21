@@ -45,7 +45,8 @@ function DownloadCard({
           <div>
             <CardTitle>{PLATFORM_LABELS[release.platform]}</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Version {release.version} · {formatBytes(release.file_size_bytes)}
+              Version {release.version}
+              {release.file_size_bytes !== null && ` · ${formatBytes(release.file_size_bytes)}`}
             </p>
           </div>
         </div>

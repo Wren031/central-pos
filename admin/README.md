@@ -32,10 +32,11 @@ react-router-dom 7 · sonner
   supported POS types, subscription plans, how-it-works, installer downloads
   (published releases only), FAQ, and footer. "Get Started" links to the POS
   client's registration (`VITE_POS_APP_URL`); the catch-all route serves it.
-- **Downloads** — publish POS installers (Android APK / Windows EXE) to the
-  public `pos-releases` storage bucket with version, file size, release notes,
-  and draft/published status. Only published releases appear on the landing
-  page. No release is seeded — create one after uploading a real build.
+- **Downloads** — publish POS installers (Android APK / Windows EXE) with
+  version, release notes, and draft/published status. Installers are **not**
+  uploaded to Supabase: each release stores a direct external http(s) download
+  URL, which is required. Only published releases appear on the landing page.
+  No release is seeded — create one with the URL of a real build.
 - **Activity logs** — append-only audit trail (automatic DB triggers + RPC
   logging).
 - **Settings** — system configuration, subscription plan pricing/durations,
@@ -64,8 +65,8 @@ order**:
    (18 customers, 18 stores, subscriptions, logs)
 5. `supabase/05_categories_migration.sql` — global `categories` catalog +
    `pos_type_categories` assignments
-6. `supabase/06_releases.sql` — `pos_releases` (installer releases), anon
-   read policies for landing data, and the public `pos-releases` storage bucket
+6. `supabase/06_releases.sql` — `pos_releases` (installer releases, each with
+   a required external download URL) and anon read policies for landing data
 7. `supabase/07_payment_requests.sql`, `supabase/08_email_verification.sql` —
    GCash payment requests and email-verification support
 8. `supabase/09_pos_type_public_read.sql` — lets the session-less POS client
@@ -78,6 +79,9 @@ order**:
 11. `supabase/17_gcash_only.sql` — links `payments` to the verified
     `payment_requests` row (so each ledger entry can open its receipt), makes
     GCash the only payment method, and removes the mock payment RPC + demo rows
+12. `supabase/18_external_releases.sql` — makes `pos_releases.download_url`
+    required and drops the uploaded-file column. It refuses to run while any
+    release still has no URL, so paste each external URL in Downloads first.
 
 The scripts are idempotent — safe to re-run after a partial failure.
 

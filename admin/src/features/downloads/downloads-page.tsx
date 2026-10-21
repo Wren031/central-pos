@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   ExternalLink,
+  Link2,
   Loader2,
   MonitorDown,
   Pencil,
@@ -8,7 +9,6 @@ import {
   RotateCw,
   Smartphone,
   Trash2,
-  UploadCloud,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -16,11 +16,9 @@ import { useAsync } from '@/hooks/use-async'
 import { errorMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import {
-  formatBytes,
   PLATFORM_FILE_HINTS,
   PLATFORM_LABELS,
   releaseDownloadHref,
-  RELEASE_BUCKET,
 } from '@/lib/releases'
 import type { PosRelease, ReleasePlatform, ReleaseStatus } from '@/lib/types'
 import { PageHeader } from '@/components/common/page-header'
@@ -47,9 +45,7 @@ interface ReleaseForm {
   version: string
   release_notes: string
   published: boolean
-  file: File | null
   download_url: string
-  keepExistingFile: boolean
 }
 
 const EMPTY_FORM: ReleaseForm = {
@@ -57,9 +53,7 @@ const EMPTY_FORM: ReleaseForm = {
   version: '',
   release_notes: '',
   published: false,
-  file: null,
   download_url: '',
-  keepExistingFile: false,
 }
 
 const VERSION_RE = /^\d+\.\d+(\.\d+)?([-+][0-9A-Za-z.-]+)?$/
@@ -97,9 +91,7 @@ export function DownloadsPage() {
         version: r.version,
         release_notes: r.release_notes ?? '',
         published: r.status === 'published',
-        file: null,
         download_url: r.download_url ?? '',
-        keepExistingFile: Boolean(r.file_path),
       },
     })
   }
@@ -128,10 +120,6 @@ export function DownloadsPage() {
     try {
       const { error } = await supabase.from('pos_releases').delete().eq('id', deleting.id)
       if (error) throw new Error(errorMessage(error))
-      if (deleting.file_path) {
-        // Best-effort cleanup of the uploaded installer; the row is already gone.
-        await supabase.storage.from(RELEASE_BUCKET).remove([deleting.file_path])
-      }
       toast.success(`Release v${deleting.version} deleted.`)
       setDeleting(null)
       releases.reload()
@@ -150,50 +138,28 @@ export function DownloadsPage() {
       toast.error('Enter a version like 1.0.0 or 1.2.3-beta.')
       return
     }
-    if (!form.file && !form.download_url.trim() && !(mode === 'edit' && form.keepExistingFile)) {
-      toast.error('Upload an installer file or provide a download URL.')
+
+    const downloadUrl = form.download_url.trim()
+    if (!downloadUrl) {
+      toast.error('A download URL is required.')
       return
     }
-    if (form.download_url.trim()) {
-      try {
-        const u = new URL(form.download_url.trim())
-        if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error()
-      } catch {
-        toast.error('Download URL must be a valid http(s) URL.')
-        return
-      }
+    try {
+      const u = new URL(downloadUrl)
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error()
+    } catch {
+      toast.error('Download URL must be a valid http(s) URL.')
+      return
     }
 
     setBusy(true)
     try {
-      let filePath: string | null = null
-      const previousFilePath =
-        mode === 'edit'
-          ? (releases.data ?? []).find((r) => r.id === id)?.file_path ?? null
-          : null
-
-      if (form.file) {
-        const hint = PLATFORM_FILE_HINTS[form.platform]
-        const safeName = form.file.name.replace(/[^A-Za-z0-9._-]/g, '_')
-        const path = `${form.platform}/v${form.version.trim()}-${Date.now()}-${safeName}`
-        const { error: upErr } = await supabase.storage
-          .from(RELEASE_BUCKET)
-          .upload(path, form.file, { upsert: false, contentType: form.file.type || undefined })
-        if (upErr) throw new Error(errorMessage(upErr))
-        filePath = path
-        if (!safeName.toLowerCase().endsWith(hint)) {
-          toast.warning(`Expected a ${hint} file for ${PLATFORM_LABELS[form.platform]}.`)
-        }
-      }
-
       const payload = {
         platform: form.platform,
         version: form.version.trim(),
         release_notes: form.release_notes.trim() || null,
         status: (form.published ? 'published' : 'draft') as ReleaseStatus,
-        file_size_bytes: form.file ? form.file.size : undefined,
-        download_url: form.download_url.trim() || null,
-        ...(filePath ? { file_path: filePath } : {}),
+        download_url: downloadUrl,
       }
 
       if (mode === 'create') {
@@ -206,10 +172,6 @@ export function DownloadsPage() {
           .update(payload)
           .eq('id', id!)
         if (error) throw new Error(errorMessage(error))
-        if (filePath && previousFilePath && previousFilePath !== filePath) {
-          // Best-effort cleanup of the installer that was just replaced.
-          await supabase.storage.from(RELEASE_BUCKET).remove([previousFilePath])
-        }
         toast.success(`Release v${payload.version} updated.`)
       }
       setEditing(null)
@@ -250,9 +212,9 @@ export function DownloadsPage() {
         <ErrorState message={releases.error} onRetry={releases.reload} />
       ) : (releases.data ?? []).length === 0 ? (
         <EmptyState
-          icon={UploadCloud}
+          icon={Link2}
           title="No releases yet"
-          description="Create your first release to make the POS installer downloadable from the landing page."
+          description="Create your first release with an external download URL to make the POS installer available from the landing page."
           action={
             <Button type="button" size="sm" onClick={openCreate}>
               <Plus className="size-4" />
@@ -268,9 +230,8 @@ export function DownloadsPage() {
                 <TableRow>
                   <TableHead>Platform</TableHead>
                   <TableHead>Version</TableHead>
-                  <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Download</TableHead>
+                  <TableHead className="hidden md:table-cell">Download URL</TableHead>
                   <TableHead className="hidden lg:table-cell">Created</TableHead>
                   <TableHead className="w-36 text-right">Actions</TableHead>
                 </TableRow>
@@ -288,9 +249,6 @@ export function DownloadsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="font-mono text-sm">v{r.version}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatBytes(r.file_size_bytes)}
-                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -303,7 +261,7 @@ export function DownloadsPage() {
                           {r.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden max-w-48 md:table-cell">
+                      <TableCell className="hidden max-w-56 md:table-cell">
                         {href ? (
                           <a
                             href={href}
@@ -311,8 +269,8 @@ export function DownloadsPage() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 truncate font-mono text-xs text-primary hover:underline"
                           >
-                            <ExternalLink className="size-3" aria-hidden />
-                            {r.file_path ?? href}
+                            <ExternalLink className="size-3 shrink-0" aria-hidden />
+                            {href}
                           </a>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -365,8 +323,8 @@ export function DownloadsPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Files upload to the public <code className="rounded bg-muted px-1 py-0.5">{RELEASE_BUCKET}</code>{' '}
-        storage bucket. Only published releases appear on the landing page.
+        Installers are hosted externally — each release stores a direct http(s) download URL. Only
+        published releases appear on the landing page.
       </p>
 
       <Modal
@@ -422,42 +380,14 @@ export function DownloadsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>
-                Installer file{' '}
-                <span className="font-normal text-muted-foreground">
-                  ({PLATFORM_FILE_HINTS[editing.form.platform]})
-                </span>
-              </Label>
-              <input
-                type="file"
-                accept={PLATFORM_FILE_HINTS[editing.form.platform]}
-                className="flex w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    form: { ...editing.form, file: e.target.files?.[0] ?? null },
-                  })
-                }
-              />
-              {editing.form.file && (
-                <p className="text-[11px] text-muted-foreground">
-                  {editing.form.file.name} · {formatBytes(editing.form.file.size)}
-                </p>
-              )}
-              {editing.mode === 'edit' && editing.form.keepExistingFile && !editing.form.file && (
-                <p className="text-[11px] text-muted-foreground">
-                  Keeping the currently uploaded file. Choose a new file to replace it.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>
-                External download URL{' '}
-                <span className="font-normal text-muted-foreground">(optional)</span>
+              <Label htmlFor="release-download-url">
+                Download URL <span className="text-destructive">*</span>
               </Label>
               <Input
+                id="release-download-url"
                 type="url"
+                inputMode="url"
+                required
                 placeholder="https://example.com/central-pos.apk"
                 value={editing.form.download_url}
                 onChange={(e) =>
@@ -465,7 +395,9 @@ export function DownloadsPage() {
                 }
               />
               <p className="text-[11px] text-muted-foreground/70">
-                Use when the installer is hosted elsewhere. Takes priority over the uploaded file.
+                Direct link to the {PLATFORM_FILE_HINTS[editing.form.platform]} hosted outside
+                Supabase (GitHub Releases, Google Drive, your CDN). Required — releases without a
+                URL cannot be published.
               </p>
             </div>
 
@@ -520,8 +452,8 @@ export function DownloadsPage() {
         message={
           <>
             Delete <span className="font-mono font-semibold">v{deleting?.version}</span> (
-            {deleting && PLATFORM_LABELS[deleting.platform]})? The uploaded file is removed too.
-            This cannot be undone.
+            {deleting && PLATFORM_LABELS[deleting.platform]})? The external file itself is not
+            touched. This cannot be undone.
           </>
         }
         confirmLabel="Delete"

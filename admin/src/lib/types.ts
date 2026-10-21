@@ -191,8 +191,8 @@ export interface PosRelease {
   id: string
   platform: ReleasePlatform
   version: string
-  file_path: string | null
-  download_url: string | null
+  /** External http(s) URL of the installer — the only download source. */
+  download_url: string
   file_size_bytes: number | null
   release_notes: string | null
   status: ReleaseStatus
