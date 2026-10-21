@@ -30,7 +30,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<AdminShell />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/users/:userId" element={<UserDetailPage />} />
               <Route path="/stores" element={<StoresPage />} />
