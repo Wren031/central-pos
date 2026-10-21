@@ -273,8 +273,8 @@ create table if not exists public.payments (
   subscription_id uuid references public.subscriptions (id) on delete set null,
   plan_id         text references public.subscription_plans (id),
   reference       text not null unique,
-  method          text not null default 'mock_card'
-                    check (method in ('mock_card', 'mock_gcash', 'mock_bank', 'cash')),
+  method          text not null default 'gcash_qr'
+                    check (method = 'gcash_qr'),
   amount          numeric(10,2) not null check (amount >= 0),
   currency        text not null default 'PHP',
   status          text not null default 'succeeded'

@@ -166,10 +166,6 @@ declare
   v_expires    timestamptz;
   v_price      numeric;
   v_plan_days  int;
-  v_n_payments int;
-  v_interval   int;
-  v_paid       timestamptz;
-  i            int;
 begin
   for u in
     select * from (values
@@ -247,31 +243,9 @@ begin
     values (v_uid, u.plan_id, u.sub_status, v_started, v_expires, v_price, v_started)
     returning id into v_sub_id;
 
-    -- mock payment history (one payment per billing period)
-    if u.plan_id <> 'trial' then
-      v_interval := case u.plan_id when 'monthly' then 30 when 'weekly' then 7 else 365 end;
-      v_n_payments := case u.plan_id
-        when 'monthly' then least(floor(u.started_days_ago / 30)::int, 3)
-        when 'weekly'  then least(floor(u.started_days_ago / 7)::int, 4)
-        else 0
-      end;
-
-      for i in 0 .. v_n_payments loop
-        v_paid := v_started - make_interval(days => i * v_interval);
-        exit when v_paid < now() - interval '330 days';
-
-        insert into public.payments
-          (user_id, subscription_id, plan_id, reference, method, amount, paid_at, notes, created_at)
-        values (
-          v_uid, v_sub_id, u.plan_id,
-          'MOCK-' || upper(substr(md5(u.email || ':' || i::text), 1, 8)),
-          (array['mock_gcash', 'mock_card', 'mock_bank'])[1 + ((u.seq + i) % 3)],
-          v_price, v_paid,
-          case when i = 0 then 'Initial subscription payment (seed)' else 'Renewal (seed)' end,
-          v_paid
-        );
-      end loop;
-    end if;
+    -- No payment rows are seeded: the ledger only ever contains real GCash
+    -- payments created by admin_approve_payment_request(). Demo subscriptions
+    -- keep their status without a fabricated transaction.
 
     -- audit history for the demo timeline
     insert into public.activity_logs (actor_id, action, entity, entity_id, summary, metadata, created_at)
@@ -289,41 +263,6 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Extra payment states for the payments filters (pending/failed/refunded)
--- ---------------------------------------------------------------------------
-insert into public.payments (user_id, subscription_id, plan_id, reference, method, amount, status, paid_at, notes)
-select s.user_id, s.id, s.plan_id,
-       'MOCK-' || upper(substr(md5(s.user_id::text || 'pending'), 1, 8)),
-       'mock_gcash', sp.price, 'pending', now() - interval '2 days',
-       'Awaiting confirmation (seed demo)'
-from public.subscriptions s
-join public.subscription_plans sp on sp.id = s.plan_id
-join public.profiles p on p.id = s.user_id
-where p.email = 'joel@joelsrestaurant.ph'
-on conflict (reference) do nothing;
-
-insert into public.payments (user_id, subscription_id, plan_id, reference, method, amount, status, paid_at, notes)
-select s.user_id, s.id, s.plan_id,
-       'MOCK-' || upper(substr(md5(s.user_id::text || 'failed'), 1, 8)),
-       'mock_card', sp.price, 'failed', now() - interval '5 days',
-       'Card declined (seed demo)'
-from public.subscriptions s
-join public.subscription_plans sp on sp.id = s.plan_id
-join public.profiles p on p.id = s.user_id
-where p.email = 'lito@litocafe.ph'
-on conflict (reference) do nothing;
-
-insert into public.payments (user_id, subscription_id, plan_id, reference, method, amount, status, paid_at, notes)
-select s.user_id, s.id, s.plan_id,
-       'MOCK-' || upper(substr(md5(s.user_id::text || 'refunded'), 1, 8)),
-       'mock_bank', sp.price, 'refunded', now() - interval '12 days',
-       'Refunded after plan downgrade request (seed demo)'
-from public.subscriptions s
-join public.subscription_plans sp on sp.id = s.plan_id
-join public.profiles p on p.id = s.user_id
-where p.email = 'norma@normaretail.ph'
-on conflict (reference) do nothing;
-
 -- ---------------------------------------------------------------------------
 -- Sample synced offline sales (foundation demo for future POS sync)
 -- ---------------------------------------------------------------------------
